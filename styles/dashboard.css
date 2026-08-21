@@ -1,0 +1,304 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ====================================================================
+   BASE — light neutral grey page background
+   ==================================================================== */
+html, body, [class*="css"] {
+    font-family: var(--font-body);
+}
+
+.stApp {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* ====================================================================
+   SIDEBAR — stays dark navy
+   ==================================================================== */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, #060C18 100%);
+    border-right: 1px solid rgba(96,165,250,0.15);
+}
+section[data-testid="stSidebar"] .stMarkdown h1,
+section[data-testid="stSidebar"] .stMarkdown h2 {
+    font-family: var(--font-display);
+    color: #F3F6FD;
+}
+
+/* ====================================================================
+   PAGE TITLES (inside dark top banner — light text)
+   ==================================================================== */
+.dash-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #F3F6FD 0%, #22D3EE 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dash-subtitle {
+    color: #A9BBDD;
+    font-size: 0.90rem;
+    font-weight: 400;
+}
+
+/* ====================================================================
+   SECTION HEADERS (inside white cards — dark text)
+   ==================================================================== */
+.section-header {
+    font-family: var(--font-display);
+    font-size: 0.97rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.section-header::before {
+    content: "";
+    width: 3px;
+    height: 16px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--accent-primary), var(--accent-secondary));
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* ====================================================================
+   GLASS-CARD — ALWAYS EMPTY IN STREAMLIT.
+   Each st.markdown() is wrapped in its own container div; the opening
+   <div class="glass-card"> is auto-closed by the browser before any
+   content renders, so these are always zero-content divs.
+   HIDE THEM. Use st.container(key="card_...") instead.
+   ==================================================================== */
+.glass-card {
+    display: none !important;
+}
+
+/* ====================================================================
+   REAL CARD — via st.container(key="card_...")
+   Streamlit wraps a container's entire content inside one element,
+   so this selector actually captures the card content correctly.
+   ==================================================================== */
+div[class*="st-key-card_"] {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 20px 22px;
+    box-shadow: 0 1px 3px rgba(16,24,40,0.05), 0 4px 14px rgba(16,24,40,0.07);
+    transition: box-shadow 0.22s ease, border-color 0.22s ease;
+}
+div[class*="st-key-card_"]:hover {
+    border-color: rgba(59,130,246,0.28);
+    box-shadow: 0 2px 8px rgba(16,24,40,0.07), 0 8px 24px rgba(59,130,246,0.09);
+}
+
+/* About page — data-limitation disclaimer card keeps its amber accent
+   border (previously an inline style on the old glass-card div, which
+   st.container(key=...) can't take inline styles for). */
+div[class*="st-key-card_ab_2"] {
+    border-left: 4px solid #F59E0B;
+}
+
+/* ====================================================================
+   KPI CARD — consistent fixed height, truncated text to prevent wrapping
+   ==================================================================== */
+.kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 14px;
+    padding: 16px 16px 14px 16px;
+    box-shadow: 0 1px 3px rgba(16,24,40,0.05), 0 3px 10px rgba(16,24,40,0.07);
+    transition: all 0.22s ease;
+    /* Fixed height so all KPI cards in a row are identical */
+    min-height: 130px;
+    max-height: 130px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow: hidden;
+}
+.kpi-card:hover {
+    border-color: rgba(59,130,246,0.32);
+    box-shadow: 0 2px 6px rgba(16,24,40,0.08), 0 8px 20px rgba(59,130,246,0.10);
+    transform: translateY(-1px);
+}
+
+/* Icon badge — small pastel rounded square */
+.kpi-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 9px;
+    flex-shrink: 0;
+    background: rgba(59,130,246,0.09);
+}
+
+/* Label — uppercase small caps, truncate to one line */
+.kpi-label {
+    font-size: 0.67rem;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Value — main number/text, truncate to one line */
+.kpi-value {
+    font-family: var(--font-display);
+    font-size: 1.30rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+/* Sub-label — one line, muted, truncated */
+.kpi-sub {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kpi-delta-up   { color: var(--success); font-size: 0.76rem; font-weight: 600; }
+.kpi-delta-down { color: var(--danger);  font-size: 0.76rem; font-weight: 600; }
+
+/* ====================================================================
+   INSIGHT PILL — on light cards
+   ==================================================================== */
+.insight-pill {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(59,130,246,0.05);
+    border: 1px solid rgba(59,130,246,0.14);
+    margin-bottom: 8px;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+}
+.insight-pill b { color: var(--text-primary); }
+
+/* ====================================================================
+   STREAMLIT WIDGET OVERRIDES — light theme
+   ==================================================================== */
+div[data-baseweb="select"] > div {
+    background: #FFFFFF !important;
+    border-color: var(--border-glass) !important;
+    border-radius: 10px !important;
+    color: var(--text-primary) !important;
+    min-height: 42px;
+}
+li[role="option"] { color: var(--text-primary) !important; }
+
+/* Action buttons in main content */
+.stApp .stButton > button {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-tertiary));
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    box-shadow: 0 3px 10px rgba(59,130,246,0.22);
+    transition: all 0.2s ease;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.stApp .stButton > button:hover {
+    box-shadow: 0 5px 16px rgba(59,130,246,0.38);
+    transform: translateY(-1px);
+}
+
+/* Sidebar nav buttons — transparent (sidebar.py also injects inline CSS) */
+section[data-testid="stSidebar"] .stButton > button {
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    color: #A9BBDD !important;
+    font-weight: 500 !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    justify-content: flex-start !important;
+    transform: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(59,130,246,0.10) !important;
+    color: #F3F6FD !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Filter row — align Clear button bottom */
+div[data-testid="stHorizontalBlock"] .stButton {
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+}
+
+/* ====================================================================
+   EQUAL-HEIGHT COLUMNS
+   ==================================================================== */
+div[data-testid="stHorizontalBlock"] { align-items: stretch; }
+div[data-testid="column"] { display: flex; }
+div[data-testid="column"] > div { width: 100%; display: flex; flex-direction: column; }
+
+/* ====================================================================
+   DIVIDER
+   ==================================================================== */
+hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+    opacity: 0.18;
+    margin: 0.6rem 0 1rem 0;
+}
+
+/* ====================================================================
+   SCROLLBAR
+   ==================================================================== */
+::-webkit-scrollbar          { width: 7px; height: 7px; }
+::-webkit-scrollbar-track    { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb    { background: rgba(59,130,246,0.30); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,0.55); }
+
+/* ====================================================================
+   HIDE STREAMLIT CHROME
+   ==================================================================== */
+#MainMenu, footer { visibility: hidden; }
+header[data-testid="stHeader"] { background: transparent; background-color: rgba(0,0,0,0); }
+div[data-testid="stToolbar"]   { background: transparent; }
+.stApp > header                { background: transparent; }
+
+/* ====================================================================
+   NAV SECTION LABELS (sidebar)
+   ==================================================================== */
+.nav-section-label {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: #4A5E80;
+    text-transform: uppercase;
+    padding: 14px 10px 4px 10px;
+}
+
+/* ====================================================================
+   RADIO overrides
+   ==================================================================== */
+.stRadio label { color: var(--text-secondary) !important; font-size: 0.83rem; }
