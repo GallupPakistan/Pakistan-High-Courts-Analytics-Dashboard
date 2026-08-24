@@ -34,6 +34,20 @@ st.set_page_config(
 
 st.markdown(get_theme_css(), unsafe_allow_html=True)
 
+# Hide Streamlit's built-in top-right toolbar (Share / Star / Edit / GitHub
+# icons) — this is Streamlit Cloud/Community chrome, not part of the app.
+st.markdown(
+    """
+    <style>
+    [data-testid="stToolbar"] { visibility: hidden; height: 0; position: fixed; }
+    [data-testid="stDecoration"] { display: none; }
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 active_page = render_sidebar()
 
 # Exception class names that are Streamlit's own internal control flow
