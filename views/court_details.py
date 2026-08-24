@@ -58,7 +58,7 @@ def render():
             if total_cases:
                 b_counts = df["Bench_Location"].value_counts().head(8)
                 fig = gradient_bar(b_counts.index.tolist(), b_counts.values.tolist(), color=court_color, orientation="h")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -73,7 +73,7 @@ def render():
                 rc1, rc2  = st.columns([1.1, 1])
                 with rc1:
                     fig = futuristic_radial(labels, vals, center_label="Court Total", center_value=f"{total_cases:,}", height=240)
-                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
                     st.markdown(radial_legend_html(labels, vals), unsafe_allow_html=True)
             else:
@@ -87,7 +87,7 @@ def render():
             top_j = df["Judge"].value_counts().dropna().head(10)
             judge_labels = [clean_judge_label(j) for j in top_j.index.tolist()]
             fig   = gradient_bar(judge_labels, top_j.values.tolist(), color=COLORS["accent_secondary"], orientation="h", height=420)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
@@ -100,7 +100,7 @@ def render():
             rc1, rc2 = st.columns([1.1, 1])
             with rc1:
                 fig = futuristic_radial(bt.index.tolist(), bt.values.tolist(), center_label="Formations", center_value=f"{bt.sum():,}", height=240)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             with rc2:
                 st.markdown(radial_legend_html(bt.index.tolist(), bt.values.tolist()), unsafe_allow_html=True)
         else:
@@ -116,7 +116,7 @@ def render():
             fig = glow_trend(monthly["Year_Month"].tolist(),
                              {sel_court: monthly["Listings"].tolist()},
                              colors={sel_court: court_color}, height=320)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
