@@ -103,7 +103,7 @@ def render_sidebar() -> str:
                 is_active = st.session_state.active_page == label
                 wrapper_class = "nav-active" if is_active else ""
                 st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
-                if st.button(label, key=f"nav_{label}", use_container_width=True, icon=f":material/{mat_icon}:"):
+                if st.button(label, key=f"nav_{label}", width='stretch', icon=f":material/{mat_icon}:"):
                     st.session_state.active_page = label
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
