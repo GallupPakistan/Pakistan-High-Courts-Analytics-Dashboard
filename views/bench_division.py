@@ -67,7 +67,7 @@ def render():
             if total_cases:
                 b_counts = df["Bench_Location"].value_counts().head(10)
                 fig = gradient_bar(b_counts.index.tolist(), b_counts.values.tolist(), color=COLORS["accent_primary"], orientation="h")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -79,7 +79,7 @@ def render():
                 rc1, rc2 = st.columns([1.1, 1])
                 with rc1:
                     fig = futuristic_radial(bt.index.tolist(), bt.values.tolist(), center_label="Formations", center_value=f"{bt.sum():,}", height=240)
-                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
                     st.markdown(radial_legend_html(bt.index.tolist(), bt.values.tolist()), unsafe_allow_html=True)
             else:
@@ -98,7 +98,7 @@ def render():
             bt_pivot = df[df["Bench_Type_Group"].isin(top_bt)].groupby(["Bench_Type_Group", "Court"]).size().unstack(fill_value=0)
             series = {c: bt_pivot[c].tolist() for c in COURTS_ORDER if c in bt_pivot.columns}
             fig = grouped_bar(top_bt, series, colors=COURT_COLORS, height=360)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
@@ -115,7 +115,7 @@ def render():
             if total_cases:
                 rooms = df["Court_Room"].value_counts().dropna().head(8)
                 fig = gradient_bar(rooms.index.tolist(), rooms.values.tolist(), color=COLORS["accent_secondary"])
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -135,7 +135,7 @@ def render():
                     .sort_values("Total_Listings", ascending=False)
                     .head(10)
                 )
-                st.dataframe(bench_summary, use_container_width=True, hide_index=True)
+                st.dataframe(bench_summary, width='stretch', hide_index=True)
             else:
                 st.info("No data for current filters.")
 
@@ -152,7 +152,7 @@ def render():
             if total_cases:
                 judges_per_bench = df.groupby("Bench_Location")["Judge"].nunique().sort_values(ascending=False).head(10)
                 fig = gradient_bar(judges_per_bench.index.tolist(), judges_per_bench.values.tolist(), color=COLORS["accent_tertiary"], orientation="h")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -170,7 +170,7 @@ def render():
                 series = {c: pivot_bt[c].tolist() for c in top_5_benches if c in pivot_bt.columns}
                 bench_colors = {c: CHART_COLORWAY[i % len(CHART_COLORWAY)] for i, c in enumerate(series.keys())}
                 fig = glow_trend(pivot_bt.index.tolist(), series, colors=bench_colors, height=340)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
