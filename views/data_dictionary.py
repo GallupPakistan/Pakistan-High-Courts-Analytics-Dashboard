@@ -169,7 +169,7 @@ def render():
         dict_df = pd.DataFrame(SCHEMA_DICTIONARY)
         st.dataframe(
             dict_df,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
                 "Column": st.column_config.TextColumn("Column Name", width="medium"),
@@ -194,7 +194,7 @@ def render():
         with st.container(key="card_dd_3"):
             section_header("Column Completeness (% Populated)")
             fig = gradient_bar(completeness.index.tolist(), completeness.values.tolist(), color=COLORS["accent_primary"], orientation="h", value_suffix="%", height=460)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
 
     with dc2:
         with st.container(key="card_dd_4"):
@@ -203,7 +203,7 @@ def render():
             card_cols = [c for c in card_cols if c in df.columns]
             distinct_counts = pd.Series({c: df[c].nunique() for c in card_cols}).sort_values()
             fig = gradient_bar(distinct_counts.index.tolist(), distinct_counts.values.tolist(), color=COLORS["accent_secondary"], orientation="h", height=460)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             st.caption("Case_Category, Section, Case_No, Petitioner and Respondent are excluded here — free-text fields with thousands of distinct values that would dwarf this scale.")
 
     st.write("")
