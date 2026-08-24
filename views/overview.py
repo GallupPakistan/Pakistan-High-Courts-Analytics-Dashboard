@@ -80,7 +80,7 @@ def render():
         if total_cases:
             fig = build_bench_location_map(df)
             st.plotly_chart(
-                fig, use_container_width=True, config={"displayModeBar": False},
+                fig, width='stretch', config={"displayModeBar": False},
                 on_select="rerun", selection_mode=["points"], key="ov_map_select",
             )
             st.caption(
@@ -104,7 +104,7 @@ def render():
             vol = df["Court"].value_counts().reindex(COURTS_ORDER).dropna()
             if len(vol):
                 fig = gradient_bar(vol.index.tolist(), vol.values.tolist(), color=COLORS["accent_primary"])
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for the current filter selection.")
 
@@ -119,7 +119,7 @@ def render():
                 rc1, rc2   = st.columns([1.1, 1])
                 with rc1:
                     fig = futuristic_radial(labels, values, center_label="Total Cases", center_value=f"{total_cases:,}", height=240)
-                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
                     st.markdown(radial_legend_html(labels, values), unsafe_allow_html=True)
             else:
@@ -134,7 +134,7 @@ def render():
         section_header("Case Flow: Court → Bench Type → Category")
         if total_cases:
             fig = build_court_flow_sankey(df)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             st.caption(
                 "Ribbon width = case volume along that path. Top 7 categories shown by volume; "
                 "the rest are folded into \"Other\"."
@@ -154,7 +154,7 @@ def render():
             pivot    = trend_df.pivot(index="Year_Month", columns="Court", values="Cases").fillna(0).sort_index()
             series   = {c: pivot[c].tolist() for c in COURTS_ORDER if c in pivot.columns}
             fig      = glow_trend(pivot.index.tolist(), series, colors=COURT_COLORS, height=360)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for the current filter selection.")
 
@@ -173,7 +173,7 @@ def render():
                 rc1, rc2 = st.columns([1.1, 1])
                 with rc1:
                     fig = futuristic_radial(bt.index.tolist(), bt.values.tolist(), center_label="Listings", center_value=f"{bt.sum():,}", height=240)
-                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
                     st.markdown(radial_legend_html(bt.index.tolist(), bt.values.tolist()), unsafe_allow_html=True)
             else:
@@ -190,7 +190,7 @@ def render():
                 top_benches["Bench_Location"] = top_benches["Bench_Location"].fillna("(Unspecified)")
                 st.dataframe(
                     top_benches.rename(columns={"Bench_Location": "Bench / Location"}),
-                    use_container_width=True, hide_index=True,
+                    width='stretch', hide_index=True,
                 )
             else:
                 st.info("No data for the current filter selection.")
