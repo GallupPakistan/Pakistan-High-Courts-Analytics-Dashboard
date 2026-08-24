@@ -39,8 +39,8 @@ st.markdown(get_theme_css(), unsafe_allow_html=True)
 st.markdown(
     """
     <style>
-    [data-testid="stToolbar"] { visibility: hidden; height: 0; position: fixed; }
-    [data-testid="stDecoration"] { display: none; }
+    [data-testid="stToolbarActions"] { display: none; }
+    [data-testid="stAppDeployButton"] { display: none; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     </style>
