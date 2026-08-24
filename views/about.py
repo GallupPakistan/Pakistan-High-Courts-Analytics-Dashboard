@@ -77,7 +77,7 @@ def render():
         rc1, rc2 = st.columns([1.1, 1])
         with rc1:
             fig = futuristic_radial(vol.index.tolist(), vol.values.tolist(), center_label="Total Listings", center_value=f"{vol.sum():,}", height=260)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         with rc2:
             st.markdown(radial_legend_html(vol.index.tolist(), vol.values.tolist()), unsafe_allow_html=True)
 
