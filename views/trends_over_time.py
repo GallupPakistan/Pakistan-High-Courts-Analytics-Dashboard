@@ -66,7 +66,7 @@ def render():
             pivot = trend_df.pivot(index="Year_Month", columns="Court", values="Cases").fillna(0).sort_index()
             series = {c: pivot[c].tolist() for c in COURTS_ORDER if c in pivot.columns}
             fig = glow_trend(pivot.index.tolist(), series, colors=COURT_COLORS, height=380)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
@@ -81,7 +81,7 @@ def render():
         if total_cases:
             cum = monthly_counts.sort_index().cumsum()
             fig = glow_trend(cum.index.tolist(), {"Cumulative Listings": cum.values.tolist()}, colors={"Cumulative Listings": COLORS["accent_tertiary"]}, height=300)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
@@ -99,7 +99,7 @@ def render():
                 yearly = df.dropna(subset=["Year"]).groupby(["Year", "Court"]).size().unstack(fill_value=0)
                 yearly["Total"] = yearly.sum(axis=1)
                 yearly.index = yearly.index.astype(int).astype(str)
-                st.dataframe(yearly.reset_index(), use_container_width=True, hide_index=True)
+                st.dataframe(yearly.reset_index(), width='stretch', hide_index=True)
             else:
                 st.info("No data for current filters.")
 
@@ -111,7 +111,7 @@ def render():
                 mom_df["Growth_%"] = mom_df["Listings"].pct_change() * 100
                 mom_df["Growth_%"] = mom_df["Growth_%"].fillna(0)
                 fig = gradient_bar(mom_df["Year_Month"].tolist(), mom_df["Growth_%"].tolist(), color=COLORS["accent_secondary"], value_suffix="%")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("Insufficient monthly periods to calculate MoM growth.")
 
@@ -128,7 +128,7 @@ def render():
             years = yearly_raw.index.astype(int).astype(str).tolist()
             series = {c: yearly_raw[c].tolist() for c in COURTS_ORDER if c in yearly_raw.columns}
             fig = grouped_bar(years, series, colors=COURT_COLORS, height=340)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
@@ -149,7 +149,7 @@ def render():
                     if len(cdf):
                         c_monthly = cdf.dropna(subset=["Year_Month"]).groupby("Year_Month").size().reset_index(name="Cases").sort_values("Year_Month")
                         fig = glow_trend(c_monthly["Year_Month"].tolist(), {court_name: c_monthly["Cases"].tolist()}, colors={court_name: COURT_COLORS[court_name]}, height=180)
-                        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                        st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                     else:
                         st.caption("No data")
         else:
@@ -167,7 +167,7 @@ def render():
             dow_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
             dow_counts = df["Hearing_Date"].dt.day_name().value_counts().reindex(dow_order).dropna()
             fig = gradient_bar(dow_counts.index.tolist(), dow_counts.values.tolist(), multicolor=True)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
