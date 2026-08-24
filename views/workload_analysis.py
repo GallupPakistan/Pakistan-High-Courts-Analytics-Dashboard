@@ -91,7 +91,7 @@ def render():
                 top_15_j = j_counts.head(15)
                 top_15_labels = _labels_with_share(top_15_j.index.tolist(), top_15_j.values.tolist(), total_cases)
                 fig = gradient_bar(top_15_labels, top_15_j.values.tolist(), color=COLORS["accent_primary"], orientation="h")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No judge data available for current filters.")
 
@@ -106,7 +106,7 @@ def render():
                     labels=["<100", "100-500", "501-1k", "1k-5k", ">5k"]
                 ).value_counts().sort_index()
                 fig = gradient_bar(buckets.index.tolist(), buckets.values.tolist(), color=COLORS["accent_secondary"])
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -121,7 +121,7 @@ def render():
             bottom_10_j = j_counts.tail(10).sort_values()
             bottom_10_labels = _labels_with_share(bottom_10_j.index.tolist(), bottom_10_j.values.tolist(), total_cases)
             fig = gradient_bar(bottom_10_labels, bottom_10_j.values.tolist(), color=COLORS["accent_secondary"], orientation="h")
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("Not enough distinct judges for a bottom-10 view.")
 
@@ -167,7 +167,7 @@ def render():
                 for i, c in enumerate(top_5_j) if c in pivot_j.columns
             }
             fig = glow_trend(pivot_j.index.tolist(), series, colors=trend_colors, height=420)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
@@ -197,7 +197,7 @@ def render():
                         "Max Single Judge Load": f"{max_j:,}",
                         "Busiest Judge": busiest,
                     })
-            st.dataframe(pd.DataFrame(j_court_stats), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(j_court_stats), width='stretch', hide_index=True)
         else:
             st.info("No data for current filters.")
 
@@ -214,7 +214,7 @@ def render():
             if total_cases:
                 top_p_adv = df["Petitioner_Advocate"].value_counts().dropna().head(10)
                 fig = gradient_bar(top_p_adv.index.tolist(), top_p_adv.values.tolist(), color=COLORS["accent_primary"], orientation="h")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -224,7 +224,7 @@ def render():
             if total_cases:
                 top_r_adv = df["Respondent_Advocate"].value_counts().dropna().head(10)
                 fig = gradient_bar(top_r_adv.index.tolist(), top_r_adv.values.tolist(), color=COLORS["accent_tertiary"], orientation="h")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -277,7 +277,7 @@ def render():
                     labels=["1x", "2-3x", "4-10x", "10+x"]
                 ).value_counts().sort_index()
                 fig = gradient_bar(buckets.index.tolist(), buckets.values.tolist(), color=COLORS["accent_tertiary"])
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
 
             with fc2:
                 st.markdown(f"<div style='font-size:0.88rem;font-weight:600;color:{COLORS['text_primary']};margin-bottom:8px;'>Top 10 Most Re-Listed Cases</div>", unsafe_allow_html=True)
@@ -293,7 +293,7 @@ def render():
                     .sort_values("Listings", ascending=False)
                     .head(10)
                 )
-                st.dataframe(top_recurring, use_container_width=True, hide_index=True)
+                st.dataframe(top_recurring, width='stretch', hide_index=True)
         else:
             st.info("No data for current filters.")
 
