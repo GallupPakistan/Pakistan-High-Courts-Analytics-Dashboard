@@ -63,7 +63,7 @@ def render():
             if total_cases:
                 court_counts = df["Court"].value_counts()
                 fig = gradient_bar(court_counts.index.tolist(), court_counts.values.tolist(), color=COLORS["accent_primary"])
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for the current filter selection.")
 
@@ -73,7 +73,7 @@ def render():
             month_counts = df.dropna(subset=["Year_Month"]).groupby("Year_Month").size().sort_index()
             if len(month_counts):
                 fig = glow_trend(month_counts.index.tolist(), {"Records": month_counts.values.tolist()}, colors={"Records": COLORS["accent_secondary"]}, height=300)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for the current filter selection.")
 
@@ -105,11 +105,11 @@ def render():
                     data=csv_data,
                     file_name="pakistan_high_courts_filtered_export.csv",
                     mime="text/csv",
-                    use_container_width=True,
+                    width='stretch',
                     icon=":material/download:",
                 )
             else:
-                st.button("Download CSV Dataset", disabled=True, use_container_width=True)
+                st.button("Download CSV Dataset", disabled=True, width='stretch')
 
         with c3:
             st.markdown(
@@ -129,7 +129,7 @@ def render():
 
         if total_cases > 0:
             preview_df = df.head(500)
-            st.dataframe(preview_df, use_container_width=True, hide_index=True)
+            st.dataframe(preview_df, width='stretch', hide_index=True)
         else:
             st.info("No matching records found for the current filter criteria.")
 
@@ -154,6 +154,6 @@ def render():
                     "Null / Missing %": f"{null_pct:.1f}%",
                     "Distinct Values": df[col].nunique(),
                 })
-            st.dataframe(pd.DataFrame(col_summary), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(col_summary), width='stretch', hide_index=True)
         else:
             st.info("No data available.")
