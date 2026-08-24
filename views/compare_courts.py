@@ -170,7 +170,7 @@ def render():
                 fig = grouped_bar(top_cats, series_h2h,
                                   colors={court_a: COURT_COLORS[court_a], court_b: COURT_COLORS[court_b]},
                                   height=320)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
 
         with h2h_c2:
             with st.container(key="card_cc_h2h_trend"):
@@ -182,7 +182,7 @@ def render():
                 fig = glow_trend(pivot_h2h.index.tolist(), series_t,
                                  colors={court_a: COURT_COLORS[court_a], court_b: COURT_COLORS[court_b]},
                                  height=320)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
 
         # Delta insight
         with st.container(key="card_cc_h2h_delta"):
@@ -244,7 +244,7 @@ def render():
                 fig = gradient_bar(vol_df.index.tolist(), display_vals, color=COLORS["accent_primary"], value_suffix="%")
             else:
                 fig = gradient_bar(vol_df.index.tolist(), vol_df.values.tolist(), color=COLORS["accent_primary"])
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for the current filter selection.")
 
@@ -264,7 +264,7 @@ def render():
                         ct = df[df["Court"] == court].shape[0]
                         series[court] = ((cat_court[court] / ct * 100).tolist() if (norm_mode == "% Share" and ct > 0) else cat_court[court].tolist())
                 fig = grouped_bar(top_5_cats, series, colors=COURT_COLORS, height=320)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for the current filter selection.")
 
@@ -280,7 +280,7 @@ def render():
                         ct = df[df["Court"] == court].shape[0]
                         series[court] = ((bench_court[court] / ct * 100).tolist() if (norm_mode == "% Share" and ct > 0) else bench_court[court].tolist())
                 fig = grouped_bar(top_bt, series, colors=COURT_COLORS, height=320)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for the current filter selection.")
 
@@ -303,7 +303,7 @@ def render():
                         "Benches": cdf["Bench_Location"].nunique(),
                         cat_label + "s": cdf[cat_col].nunique(),
                     })
-            st.dataframe(pd.DataFrame(court_summary), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(court_summary), width='stretch', hide_index=True)
         else:
             st.info("No data for the current filter selection.")
 
@@ -317,7 +317,7 @@ def render():
             pivot    = trend_df.pivot(index="Year_Month", columns="Court", values="Cases").fillna(0).sort_index()
             series   = {c: pivot[c].tolist() for c in COURTS_ORDER if c in pivot.columns}
             fig      = glow_trend(pivot.index.tolist(), series, colors=COURT_COLORS, height=340)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for the current filter selection.")
 
