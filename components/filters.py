@@ -48,7 +48,7 @@ def render_filter_bar(df: pd.DataFrame, key_prefix: str, show_court=True):
 
     with cols[idx]:
         st.write("")
-        clear = st.button("Clear", key=f"{key_prefix}_clear", use_container_width=True)
+        clear = st.button("Clear", key=f"{key_prefix}_clear", width='stretch')
 
     if clear:
         # _map_select isn't created by this function (a page's map, if it
