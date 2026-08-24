@@ -20,7 +20,6 @@ category strings.
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import sys
 import os
@@ -116,14 +115,13 @@ def render():
                     "desc": f"{pct:.1f}% of all listings in the current filter selection.",
                     "icon": icons_cycle[i % len(icons_cycle)],
                 })
-            components.html(
-                lightbulb_category_chart(
+            st.iframe(
+                src=lightbulb_category_chart(
                     lb_categories,
                     center_label=f"Top {len(lb_categories)} Share",
                     center_value=f"{top4_share:.0f}%",
                 ),
                 height=350,
-                scrolling=False,
             )
         else:
             st.info("No data for current filters.")
@@ -141,7 +139,7 @@ def render():
             if total_cases:
                 top_10 = df[cat_col].value_counts().head(10)
                 fig = gradient_bar(top_10.index.tolist(), top_10.values.tolist(), color=COLORS["accent_primary"], orientation="h")
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -156,7 +154,7 @@ def render():
                 rc1, rc2 = st.columns([1.1, 1])
                 with rc1:
                     fig = futuristic_radial(labels, vals, center_label="Category Total", center_value=f"{total_cases:,}", height=240)
-                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
                     st.markdown(radial_legend_html(labels, vals), unsafe_allow_html=True)
             else:
@@ -175,14 +173,14 @@ def render():
             cat_court_df = df[df[cat_col].isin(top_cats)].groupby([cat_col, "Court"]).size().unstack(fill_value=0)
             series = {c: cat_court_df[c].tolist() for c in COURTS_ORDER if c in cat_court_df.columns}
             fig = grouped_bar(top_cats, series, colors=COURT_COLORS, height=360)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
 
             st.write("")
             st.markdown(f"<div style='font-size:0.88rem;font-weight:600;color:#A9BBDD;margin-bottom:8px;'>{cat_label} vs Court Crosstab Matrix</div>", unsafe_allow_html=True)
             crosstab = pd.crosstab(df[cat_col], df["Court"]).reindex(columns=COURTS_ORDER).fillna(0).astype(int)
             crosstab["Total"] = crosstab.sum(axis=1)
             crosstab = crosstab.sort_values("Total", ascending=False).head(10)
-            st.dataframe(crosstab.reset_index(), use_container_width=True, hide_index=True)
+            st.dataframe(crosstab.reset_index(), width='stretch', hide_index=True)
         else:
             st.info("No data for current filters.")
 
@@ -203,7 +201,7 @@ def render():
                 cat_bt_df = sub.groupby([cat_col, "Bench_Type"]).size().unstack(fill_value=0)
                 series = {c: cat_bt_df[c].tolist() for c in top_bts if c in cat_bt_df.columns}
                 fig = grouped_bar(top_cats_bt, series, height=360)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -216,7 +214,7 @@ def render():
                 years = yr_df.index.astype(int).astype(str).tolist()
                 series = {c: yr_df[c].tolist() for c in top_4_yr if c in yr_df.columns}
                 fig = grouped_bar(years, series, height=360)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
 
@@ -235,7 +233,7 @@ def render():
             series_cat = {c: pivot_cat[c].tolist() for c in top_4_cats if c in pivot_cat.columns}
             cat_colors = {c: CHART_COLORWAY[i % len(CHART_COLORWAY)] for i, c in enumerate(series_cat.keys())}
             fig = glow_trend(pivot_cat.index.tolist(), series_cat, colors=cat_colors, height=360)
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No data for current filters.")
 
@@ -259,14 +257,13 @@ def render():
     with st.container(key="card_catg_gauge"):
         section_header("Section Citation Coverage")
         if total_cases:
-            components.html(
-                gauge_chart(
+            st.iframe(
+                src=gauge_chart(
                     value=coverage_pct_gauge,
                     title="Section Citation Coverage",
                     target=85,
                 ),
                 height=280,
-                scrolling=False,
             )
         else:
             st.info("No data for current filters.")
@@ -297,7 +294,7 @@ def render():
             )
             top_sections = sec_df["Section"].value_counts().head(10)
             fig = gradient_bar(top_sections.index.tolist(), top_sections.values.tolist(), color=COLORS["accent_secondary"], orientation="h")
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("No Section data available for the current filter selection.")
 
