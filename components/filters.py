@@ -32,7 +32,7 @@ def render_filter_bar(df: pd.DataFrame, key_prefix: str, show_court=True):
 
     with cols[idx]:
         case_category = st.selectbox(
-            "Case Category", ["All"] + sorted(df["Case_Category"].dropna().unique().tolist()[:200]),
+            "Case Category", ["All"] + sorted(df["Case_Category"].dropna().unique().tolist()),
             key=f"{key_prefix}_category"
         )
     idx += 1
