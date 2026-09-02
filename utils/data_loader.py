@@ -28,6 +28,29 @@ def load_master_data() -> pd.DataFrame:
     # Restrict the dashboard to 2026 data only (2025 and any other years excluded).
     df = df[df["Year"] == 2026].reset_index(drop=True)
 
+    # The source scrape occasionally contains fully identical rows (same
+    # court, case, hearing date, judge, parties — every column matches).
+    # These are pure duplicate records, not two different listings, and
+    # were inflating every count-based KPI/chart in the dashboard by a
+    # small but real margin. Drop them here, once, so every page downstream
+    # sees a clean row count.
+    df = df.drop_duplicates().reset_index(drop=True)
+
+    # Case_No is NOT a globally unique case identifier — the same number
+    # (e.g. "CP-44/2026") is independently re-used across different bench
+    # locations within the same court (Sibi Bench vs Khuzdar Bench, for
+    # example), since each bench/registry runs its own numbering. A proper
+    # case-identity key therefore needs Court + Bench_Location + Case_No
+    # together. This powers a "Unique Cases" metric that is distinct from
+    # "Total Listings" (= row count = every hearing/cause-list appearance,
+    # since the same case is typically listed multiple times over the
+    # period). Never use plain len(df) as a stand-in for "number of cases".
+    df["Case_UID"] = (
+        df["Court"].astype(str) + "||" +
+        df["Bench_Location"].fillna("").astype(str) + "||" +
+        df["Case_No"].astype(str)
+    )
+
     # Each court records Case_Category in its own free-text format, so the
     # same subject matter (e.g. banking litigation) can appear as dozens of
     # different raw strings across courts ("BANKING", "Civil - COS(B) -
