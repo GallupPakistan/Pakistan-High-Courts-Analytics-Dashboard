@@ -12,6 +12,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from styles.theme import COLORS, COURT_COLORS  # noqa: E402
 from utils.data_loader import load_master_data, apply_filters, COURTS_ORDER  # noqa: E402
+from utils.data_quality import find_coverage_gaps  # noqa: E402
 from components.filters import render_filter_bar  # noqa: E402
 from components.kpi_cards import render_kpi_row, section_header, insight_pill, simple_kpi_card  # noqa: E402
 from components.charts.bar_chart import gradient_bar  # noqa: E402
@@ -56,21 +57,29 @@ def render():
     filters = render_filter_bar(df_all, key_prefix="ov")
     df = apply_filters(df_all, **filters)
 
+    gaps = find_coverage_gaps(df, COURTS_ORDER)
+    if gaps:
+        st.warning(
+            f"⚠️ **Uneven data coverage** — {len(gaps)} court(s) are missing listings for "
+            "some months in the current selection, which can distort month-by-month "
+            "comparisons below. See the **Trends Over Time** page for the exact gap."
+        )
+
     st.write("")
 
     # ------------------------------------------------------------------
     # 1. KPI ROW
     # ------------------------------------------------------------------
     total_cases      = len(df)
+    unique_cases     = df["Case_UID"].nunique()
     total_judges     = df["Judge"].nunique()
-    total_benches    = df["Bench_Type_Group"].nunique()
     total_categories = df["Case_Category"].nunique()
     courts_covered   = df["Court"].nunique()
 
     render_kpi_row([
-        {"icon": icon("folder",   size=20, color=COLORS["accent_primary"]),   "label": "Total Cases",      "value": f"{total_cases:,}",      "sub": f"Across {courts_covered} courts"},
+        {"icon": icon("folder",   size=20, color=COLORS["accent_primary"]),   "label": "Total Listings",   "value": f"{total_cases:,}",      "sub": f"Hearing appearances, {courts_covered} courts"},
+        {"icon": icon("layers",   size=20, color=COLORS["accent_tertiary"]),  "label": "Unique Cases",     "value": f"{unique_cases:,}",     "sub": f"Avg {total_cases / unique_cases:.1f} listings / case" if unique_cases else "—"},
         {"icon": icon("gavel",    size=20, color=COLORS["accent_secondary"]), "label": "Judges",           "value": f"{total_judges:,}",     "sub": "On record"},
-        {"icon": icon("landmark", size=20, color=COLORS["accent_tertiary"]),  "label": "Bench Types",      "value": f"{total_benches:,}",    "sub": "Single / Division / etc."},
         {"icon": icon("tags",     size=20, color=COLORS["warning"]),          "label": "Categories",       "value": f"{total_categories:,}", "sub": "Listed categories"},
         {"icon": icon("calendar", size=20, color=COLORS["success"]),          "label": "Date Range",
          "value": f"{df['Hearing_Date'].min():%b %Y}" if total_cases else "—",
@@ -125,7 +134,7 @@ def render():
                 values     = top_cat.values.tolist() + ([other_cnt] if other_cnt > 0 else [])
                 rc1, rc2   = st.columns([1.1, 1])
                 with rc1:
-                    fig = futuristic_radial(labels, values, center_label="Total Cases", center_value=f"{total_cases:,}", height=240)
+                    fig = futuristic_radial(labels, values, center_label="Total Listings", center_value=f"{total_cases:,}", height=240)
                     st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
                     st.markdown(radial_legend_html(labels, values), unsafe_allow_html=True)
