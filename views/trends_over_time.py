@@ -18,6 +18,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from styles.theme import COLORS, COURT_COLORS  # noqa: E402
 from utils.data_loader import load_master_data, apply_filters, COURTS_ORDER  # noqa: E402
+from utils.data_quality import find_coverage_gaps  # noqa: E402
 from components.filters import render_filter_bar  # noqa: E402
 from components.kpi_cards import render_kpi_row, section_header, insight_pill, simple_kpi_card  # noqa: E402
 from components.charts.bar_chart import gradient_bar, grouped_bar  # noqa: E402
@@ -32,6 +33,25 @@ def render():
     df_all = load_master_data()
     filters = render_filter_bar(df_all, key_prefix="tot")
     df = apply_filters(df_all, **filters)
+
+    st.write("")
+
+    # ---------------------------------------------------------------------
+    # 0. DATA COVERAGE WARNING — computed live from the current selection,
+    # not hardcoded. Several courts' scrapes don't cover the same months,
+    # so month-over-month growth / peak-month figures below can reflect
+    # scrape timing rather than real case-listing trends. Flag it plainly
+    # whenever the current filter selection includes such a gap.
+    # ---------------------------------------------------------------------
+    gaps = find_coverage_gaps(df, COURTS_ORDER)
+    if gaps:
+        st.warning(
+            "⚠️ **Uneven data coverage detected** — the figures below (Peak Month, "
+            "Month-over-Month Growth, trend lines) mix courts with different scrape "
+            "windows, so spikes/dips may reflect *when data was collected*, not real "
+            "case-listing activity:\n\n" + "\n".join(f"- {g}" for g in gaps) +
+            "\n\nFilter to a single court, or read cross-court comparisons with this in mind."
+        )
 
     st.write("")
 
