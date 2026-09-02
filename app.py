@@ -20,6 +20,7 @@ Run with: streamlit run app.py
 import streamlit as st
 import sys
 import os
+import traceback
 
 sys.path.append(os.path.dirname(__file__))
 from styles.theme import get_theme_css, COLORS  # noqa: E402
@@ -86,6 +87,12 @@ def _render_page(render_fn, page_label: str):
     except Exception as exc:
         if type(exc).__name__ in _STREAMLIT_CONTROL_FLOW_EXCEPTIONS:
             raise
+        # Print the real traceback to the server console (visible in
+        # `streamlit run` logs / Streamlit Cloud logs) so an actual code
+        # bug is never indistinguishable from a genuinely empty filter
+        # combination — only the end user sees the friendly card.
+        print(f"[{page_label}] view raised an exception:", file=sys.stderr)
+        traceback.print_exc()
         _no_data_card(page_label)
 
 
