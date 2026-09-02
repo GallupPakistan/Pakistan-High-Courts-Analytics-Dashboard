@@ -1,0 +1,199 @@
+diff --git a/app.py b/app.py
+index 4bd6aaa..aa2fa30 100644
+--- a/app.py
++++ b/app.py
+@@ -20,6 +20,7 @@ Run with: streamlit run app.py
+ import streamlit as st
+ import sys
+ import os
++import traceback
+ 
+ sys.path.append(os.path.dirname(__file__))
+ from styles.theme import get_theme_css, COLORS  # noqa: E402
+@@ -86,6 +87,12 @@ def _render_page(render_fn, page_label: str):
+     except Exception as exc:
+         if type(exc).__name__ in _STREAMLIT_CONTROL_FLOW_EXCEPTIONS:
+             raise
++        # Print the real traceback to the server console (visible in
++        # `streamlit run` logs / Streamlit Cloud logs) so an actual code
++        # bug is never indistinguishable from a genuinely empty filter
++        # combination — only the end user sees the friendly card.
++        print(f"[{page_label}] view raised an exception:", file=sys.stderr)
++        traceback.print_exc()
+         _no_data_card(page_label)
+ 
+ 
+diff --git a/components/filters.py b/components/filters.py
+index fbb949c..9446094 100644
+--- a/components/filters.py
++++ b/components/filters.py
+@@ -32,7 +32,7 @@ def render_filter_bar(df: pd.DataFrame, key_prefix: str, show_court=True):
+ 
+     with cols[idx]:
+         case_category = st.selectbox(
+-            "Case Category", ["All"] + sorted(df["Case_Category"].dropna().unique().tolist()[:200]),
++            "Case Category", ["All"] + sorted(df["Case_Category"].dropna().unique().tolist()),
+             key=f"{key_prefix}_category"
+         )
+     idx += 1
+diff --git a/utils/data_loader.py b/utils/data_loader.py
+index ecda1e4..3691eb5 100644
+--- a/utils/data_loader.py
++++ b/utils/data_loader.py
+@@ -28,6 +28,29 @@ def load_master_data() -> pd.DataFrame:
+     # Restrict the dashboard to 2026 data only (2025 and any other years excluded).
+     df = df[df["Year"] == 2026].reset_index(drop=True)
+ 
++    # The source scrape occasionally contains fully identical rows (same
++    # court, case, hearing date, judge, parties — every column matches).
++    # These are pure duplicate records, not two different listings, and
++    # were inflating every count-based KPI/chart in the dashboard by a
++    # small but real margin. Drop them here, once, so every page downstream
++    # sees a clean row count.
++    df = df.drop_duplicates().reset_index(drop=True)
++
++    # Case_No is NOT a globally unique case identifier — the same number
++    # (e.g. "CP-44/2026") is independently re-used across different bench
++    # locations within the same court (Sibi Bench vs Khuzdar Bench, for
++    # example), since each bench/registry runs its own numbering. A proper
++    # case-identity key therefore needs Court + Bench_Location + Case_No
++    # together. This powers a "Unique Cases" metric that is distinct from
++    # "Total Listings" (= row count = every hearing/cause-list appearance,
++    # since the same case is typically listed multiple times over the
++    # period). Never use plain len(df) as a stand-in for "number of cases".
++    df["Case_UID"] = (
++        df["Court"].astype(str) + "||" +
++        df["Bench_Location"].fillna("").astype(str) + "||" +
++        df["Case_No"].astype(str)
++    )
++
+     # Each court records Case_Category in its own free-text format, so the
+     # same subject matter (e.g. banking litigation) can appear as dozens of
+     # different raw strings across courts ("BANKING", "Civil - COS(B) -
+diff --git a/views/overview.py b/views/overview.py
+index 6571043..00de777 100644
+--- a/views/overview.py
++++ b/views/overview.py
+@@ -12,6 +12,7 @@ import os
+ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+ from styles.theme import COLORS, COURT_COLORS  # noqa: E402
+ from utils.data_loader import load_master_data, apply_filters, COURTS_ORDER  # noqa: E402
++from utils.data_quality import find_coverage_gaps  # noqa: E402
+ from components.filters import render_filter_bar  # noqa: E402
+ from components.kpi_cards import render_kpi_row, section_header, insight_pill, simple_kpi_card  # noqa: E402
+ from components.charts.bar_chart import gradient_bar  # noqa: E402
+@@ -56,21 +57,29 @@ def render():
+     filters = render_filter_bar(df_all, key_prefix="ov")
+     df = apply_filters(df_all, **filters)
+ 
++    gaps = find_coverage_gaps(df, COURTS_ORDER)
++    if gaps:
++        st.warning(
++            f"⚠️ **Uneven data coverage** — {len(gaps)} court(s) are missing listings for "
++            "some months in the current selection, which can distort month-by-month "
++            "comparisons below. See the **Trends Over Time** page for the exact gap."
++        )
++
+     st.write("")
+ 
+     # ------------------------------------------------------------------
+     # 1. KPI ROW
+     # ------------------------------------------------------------------
+     total_cases      = len(df)
++    unique_cases     = df["Case_UID"].nunique()
+     total_judges     = df["Judge"].nunique()
+-    total_benches    = df["Bench_Type_Group"].nunique()
+     total_categories = df["Case_Category"].nunique()
+     courts_covered   = df["Court"].nunique()
+ 
+     render_kpi_row([
+-        {"icon": icon("folder",   size=20, color=COLORS["accent_primary"]),   "label": "Total Cases",      "value": f"{total_cases:,}",      "sub": f"Across {courts_covered} courts"},
++        {"icon": icon("folder",   size=20, color=COLORS["accent_primary"]),   "label": "Total Listings",   "value": f"{total_cases:,}",      "sub": f"Hearing appearances, {courts_covered} courts"},
++        {"icon": icon("layers",   size=20, color=COLORS["accent_tertiary"]),  "label": "Unique Cases",     "value": f"{unique_cases:,}",     "sub": f"Avg {total_cases / unique_cases:.1f} listings / case" if unique_cases else "—"},
+         {"icon": icon("gavel",    size=20, color=COLORS["accent_secondary"]), "label": "Judges",           "value": f"{total_judges:,}",     "sub": "On record"},
+-        {"icon": icon("landmark", size=20, color=COLORS["accent_tertiary"]),  "label": "Bench Types",      "value": f"{total_benches:,}",    "sub": "Single / Division / etc."},
+         {"icon": icon("tags",     size=20, color=COLORS["warning"]),          "label": "Categories",       "value": f"{total_categories:,}", "sub": "Listed categories"},
+         {"icon": icon("calendar", size=20, color=COLORS["success"]),          "label": "Date Range",
+          "value": f"{df['Hearing_Date'].min():%b %Y}" if total_cases else "—",
+@@ -125,7 +134,7 @@ def render():
+                 values     = top_cat.values.tolist() + ([other_cnt] if other_cnt > 0 else [])
+                 rc1, rc2   = st.columns([1.1, 1])
+                 with rc1:
+-                    fig = futuristic_radial(labels, values, center_label="Total Cases", center_value=f"{total_cases:,}", height=240)
++                    fig = futuristic_radial(labels, values, center_label="Total Listings", center_value=f"{total_cases:,}", height=240)
+                     st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
+                 with rc2:
+                     st.markdown(radial_legend_html(labels, values), unsafe_allow_html=True)
+diff --git a/views/trends_over_time.py b/views/trends_over_time.py
+index bc96ee1..67f1e9c 100644
+--- a/views/trends_over_time.py
++++ b/views/trends_over_time.py
+@@ -18,6 +18,7 @@ import os
+ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+ from styles.theme import COLORS, COURT_COLORS  # noqa: E402
+ from utils.data_loader import load_master_data, apply_filters, COURTS_ORDER  # noqa: E402
++from utils.data_quality import find_coverage_gaps  # noqa: E402
+ from components.filters import render_filter_bar  # noqa: E402
+ from components.kpi_cards import render_kpi_row, section_header, insight_pill, simple_kpi_card  # noqa: E402
+ from components.charts.bar_chart import gradient_bar, grouped_bar  # noqa: E402
+@@ -35,6 +36,25 @@ def render():
+ 
+     st.write("")
+ 
++    # ---------------------------------------------------------------------
++    # 0. DATA COVERAGE WARNING — computed live from the current selection,
++    # not hardcoded. Several courts' scrapes don't cover the same months,
++    # so month-over-month growth / peak-month figures below can reflect
++    # scrape timing rather than real case-listing trends. Flag it plainly
++    # whenever the current filter selection includes such a gap.
++    # ---------------------------------------------------------------------
++    gaps = find_coverage_gaps(df, COURTS_ORDER)
++    if gaps:
++        st.warning(
++            "⚠️ **Uneven data coverage detected** — the figures below (Peak Month, "
++            "Month-over-Month Growth, trend lines) mix courts with different scrape "
++            "windows, so spikes/dips may reflect *when data was collected*, not real "
++            "case-listing activity:\n\n" + "\n".join(f"- {g}" for g in gaps) +
++            "\n\nFilter to a single court, or read cross-court comparisons with this in mind."
++        )
++
++    st.write("")
++
+     # ---------------------------------------------------------------------
+     # 1. TEMPORAL KPI ROW
+     # ---------------------------------------------------------------------
+diff --git a/views/workload_analysis.py b/views/workload_analysis.py
+index 8237160..9359ebe 100644
+--- a/views/workload_analysis.py
++++ b/views/workload_analysis.py
+@@ -74,7 +74,7 @@ def render():
+         {"icon": icon("users", size=20, color=COLORS["accent_secondary"]), "label": "Avg Listings / Judge", "value": f"{avg_load:,.0f}", "sub": f"Median: {median_load:,.0f}"},
+         {"icon": icon("trending-up", size=20, color=COLORS["accent_tertiary"]), "label": "Busiest Judge", "value": f"{busiest_j}", "sub": f"{max_load:,} listings"},
+         {"icon": icon("folder", size=20, color=COLORS["warning"]), "label": "Petitioner Advocates", "value": f"{df['Petitioner_Advocate'].nunique():,}" if total_cases else "0", "sub": "Distinct counsel"},
+-        {"icon": icon("folder", size=20, color=COLORS["success"]), "label": "Respondent Advocates", "value": f"{df['Respondent_Advocate'].nunique():,}" if total_cases else "0", "sub": "Distinct counsel"},
++        {"icon": icon("folder", size=20, color=COLORS["success"]), "label": "Respondent Advocates", "value": f"{df['Respondent_Advocate'].nunique():,}" if total_cases else "0", "sub": f"Only {(df['Respondent_Advocate'].notna().sum() / total_cases * 100):.0f}% of listings have one" if total_cases else "Distinct counsel"},
+     ])
+ 
+     st.write("")
+@@ -221,12 +221,19 @@ def render():
+     with c4:
+         with st.container(key="card_wa_5"):
+             section_header("Top Respondent Advocates")
+-            if total_cases:
++            r_adv_filled = df["Respondent_Advocate"].notna() & (df["Respondent_Advocate"].astype(str).str.strip() != "")
++            r_coverage_pct = (r_adv_filled.sum() / total_cases * 100) if total_cases else 0
++            if total_cases and r_adv_filled.sum():
+                 top_r_adv = df["Respondent_Advocate"].value_counts().dropna().head(10)
+                 fig = gradient_bar(top_r_adv.index.tolist(), top_r_adv.values.tolist(), color=COLORS["accent_tertiary"], orientation="h")
+                 st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
++                st.caption(
++                    f"Respondent_Advocate is recorded on only {r_coverage_pct:.1f}% of listings in "
++                    "this selection — most cause-list rows don't list one. Ranking is scoped to that "
++                    "subset, not the full case volume."
++                )
+             else:
+-                st.info("No data for current filters.")
++                st.info("No Respondent Advocate data available for current filters.")
+ 
+     st.write("")
+ 
