@@ -74,7 +74,7 @@ def render():
         {"icon": icon("users", size=20, color=COLORS["accent_secondary"]), "label": "Avg Listings / Judge", "value": f"{avg_load:,.0f}", "sub": f"Median: {median_load:,.0f}"},
         {"icon": icon("trending-up", size=20, color=COLORS["accent_tertiary"]), "label": "Busiest Judge", "value": f"{busiest_j}", "sub": f"{max_load:,} listings"},
         {"icon": icon("folder", size=20, color=COLORS["warning"]), "label": "Petitioner Advocates", "value": f"{df['Petitioner_Advocate'].nunique():,}" if total_cases else "0", "sub": "Distinct counsel"},
-        {"icon": icon("folder", size=20, color=COLORS["success"]), "label": "Respondent Advocates", "value": f"{df['Respondent_Advocate'].nunique():,}" if total_cases else "0", "sub": "Distinct counsel"},
+        {"icon": icon("folder", size=20, color=COLORS["success"]), "label": "Respondent Advocates", "value": f"{df['Respondent_Advocate'].nunique():,}" if total_cases else "0", "sub": f"Only {(df['Respondent_Advocate'].notna().sum() / total_cases * 100):.0f}% of listings have one" if total_cases else "Distinct counsel"},
     ])
 
     st.write("")
@@ -221,12 +221,19 @@ def render():
     with c4:
         with st.container(key="card_wa_5"):
             section_header("Top Respondent Advocates")
-            if total_cases:
+            r_adv_filled = df["Respondent_Advocate"].notna() & (df["Respondent_Advocate"].astype(str).str.strip() != "")
+            r_coverage_pct = (r_adv_filled.sum() / total_cases * 100) if total_cases else 0
+            if total_cases and r_adv_filled.sum():
                 top_r_adv = df["Respondent_Advocate"].value_counts().dropna().head(10)
                 fig = gradient_bar(top_r_adv.index.tolist(), top_r_adv.values.tolist(), color=COLORS["accent_tertiary"], orientation="h")
                 st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
+                st.caption(
+                    f"Respondent_Advocate is recorded on only {r_coverage_pct:.1f}% of listings in "
+                    "this selection — most cause-list rows don't list one. Ranking is scoped to that "
+                    "subset, not the full case volume."
+                )
             else:
-                st.info("No data for current filters.")
+                st.info("No Respondent Advocate data available for current filters.")
 
     st.write("")
 
