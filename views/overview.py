@@ -72,7 +72,7 @@ def render():
     # ------------------------------------------------------------------
     total_cases      = len(df)
     unique_cases     = df["Case_UID"].nunique()
-    total_judges     = df["Judge"].nunique()
+    total_judges     = df.explode("Judge_List")["Judge_List"].replace("", pd.NA).nunique()
     total_categories = df["Case_Category"].nunique()
     courts_covered   = df["Court"].nunique()
 
@@ -185,13 +185,16 @@ def render():
         with st.container(key="card_ov_5"):
             section_header("Bench Type Distribution")
             if total_cases:
-                bt   = df["Bench_Type_Group"].value_counts().head(6)
+                top_bt    = df["Bench_Type_Group"].value_counts().head(6)
+                other_bt  = df["Bench_Type_Group"].value_counts().iloc[6:].sum()
+                bt_labels = top_bt.index.tolist() + (["Others"] if other_bt > 0 else [])
+                bt_values = top_bt.values.tolist() + ([other_bt] if other_bt > 0 else [])
                 rc1, rc2 = st.columns([1.1, 1])
                 with rc1:
-                    fig = futuristic_radial(bt.index.tolist(), bt.values.tolist(), center_label="Listings", center_value=f"{bt.sum():,}", height=240)
+                    fig = futuristic_radial(bt_labels, bt_values, center_label="Listings", center_value=f"{sum(bt_values):,}", height=240)
                     st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
-                    st.markdown(radial_legend_html(bt.index.tolist(), bt.values.tolist()), unsafe_allow_html=True)
+                    st.markdown(radial_legend_html(bt_labels, bt_values), unsafe_allow_html=True)
             else:
                 st.info("No data for the current filter selection.")
 
@@ -218,8 +221,12 @@ def render():
     # ------------------------------------------------------------------
     with st.container(key="card_ov_7"):
         section_header("Judge Workload Snapshot")
-        judge_counts    = df["Judge"].value_counts()
-        judge_counts    = judge_counts[judge_counts.index.notna()]
+        # Explode combined-bench rows (e.g. "Justice X | Justice Y") into one
+        # row per individual judge, so a joint-bench listing counts toward
+        # each judge who actually sat on it, not toward a fabricated
+        # "judge" that is really two-or-more people concatenated together.
+        judge_counts    = df.explode("Judge_List")["Judge_List"].value_counts()
+        judge_counts    = judge_counts[judge_counts.index.notna() & (judge_counts.index != "")]
         avg_cases       = judge_counts.mean()     if len(judge_counts) else 0
         max_judge_count = judge_counts.max()      if len(judge_counts) else 0
         min_judge_count = judge_counts.min()      if len(judge_counts) else 0
@@ -245,20 +252,20 @@ def render():
                 top_court     = court_vol.idxmax()
                 top_court_pct = court_vol.max() / total_cases * 100
                 insight_pill(icon("trending-up", size=16, color=COLORS["success"]),
-                             f"<b>{top_court} High Court</b> has the highest volume — {court_vol.max():,} cases ({top_court_pct:.1f}% of total).")
+                             f"<b>{top_court} High Court</b> has the highest volume — {court_vol.max():,} listings ({top_court_pct:.1f}% of total).")
 
             bench_top = df["Bench_Location"].value_counts()
             if len(bench_top):
                 insight_pill(icon("map-pin", size=16, color=COLORS["accent_secondary"]),
-                             f"<b>{bench_top.idxmax()}</b> is the busiest bench with {bench_top.max():,} listed cases.")
+                             f"<b>{bench_top.idxmax()}</b> is the busiest bench with {bench_top.max():,} listings.")
 
             cat_top = df["Case_Category"].value_counts()
             if len(cat_top):
                 insight_pill(icon("tags", size=16, color=COLORS["warning"]),
-                             f"<b>{cat_top.idxmax()}</b> is the most common category ({cat_top.max():,} cases).")
+                             f"<b>{cat_top.idxmax()}</b> is the most common category ({cat_top.max():,} listings).")
 
-            judge_counts = df["Judge"].value_counts()
-            judge_counts = judge_counts[judge_counts.index.notna()]
+            judge_counts = df.explode("Judge_List")["Judge_List"].value_counts()
+            judge_counts = judge_counts[judge_counts.index.notna() & (judge_counts.index != "")]
             if len(judge_counts):
                 avg  = judge_counts.mean()
                 mn   = judge_counts.min()
