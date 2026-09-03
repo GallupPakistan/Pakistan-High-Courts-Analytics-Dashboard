@@ -137,7 +137,7 @@ def render():
                     .agg(
                         Total_Listings=("Case_No", "count"),
                         Court_Rooms=("Court_Room", "nunique"),
-                        Top_Category=("Case_Category", lambda x: x.mode().iloc[0] if not x.empty else "N/A")
+                        Top_Category=("Case_Category", lambda x: x.mode().iloc[0] if len(x.mode()) else "N/A")
                     )
                     .reset_index()
                 )
