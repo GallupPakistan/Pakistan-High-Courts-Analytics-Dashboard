@@ -56,6 +56,7 @@ def gradient_bar(x_labels, values, color=None, orientation="v", value_suffix="",
         text=[f"{v:,.0f}{value_suffix}" for v in values],
         textposition="outside",
         textfont=dict(color=COLORS["text_primary"], size=12),
+        cliponaxis=False,
     )
 
     if orientation == "v":
@@ -77,6 +78,9 @@ def gradient_bar(x_labels, values, color=None, orientation="v", value_suffix="",
 
     layout = get_plotly_layout_defaults()
     layout["height"] = height
+    if orientation == "h" and values:
+        layout["xaxis"] = {**layout.get("xaxis", {}), "range": [0, max(values) * 1.18]}
+        layout["margin"] = {**layout.get("margin", {}), "r": 60}
     fig.update_layout(**layout)
     return fig
 
@@ -104,5 +108,6 @@ def grouped_bar(categories, series: dict, colors: dict = None, height=380):
     layout["barmode"] = "group"
     layout["bargap"] = 0.25
     layout["bargroupgap"] = 0.08
+    layout["xaxis"] = {**layout.get("xaxis", {}), "tickangle": -20, "automargin": True}
     fig.update_layout(**layout)
     return fig
