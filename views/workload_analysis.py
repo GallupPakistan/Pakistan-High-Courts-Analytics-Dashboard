@@ -25,6 +25,7 @@ from components.charts.bar_chart import gradient_bar  # noqa: E402
 from components.charts.trend_line import glow_trend  # noqa: E402
 from components.top_bar import render_top_bar  # noqa: E402
 from components.icons import icon  # noqa: E402
+from utils.formatting import clean_judge_label  # noqa: E402
 
 
 def _short_judge_label(raw, max_chars=28):
@@ -131,6 +132,51 @@ def render():
             st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
         else:
             st.info("Not enough distinct judges for a bottom-10 view.")
+
+    st.write("")
+
+    # ---------------------------------------------------------------------
+    # 3d. TENURE-ADJUSTED WORKLOAD — fair comparison across judges with
+    # different amounts of active time in the current selection
+    # ---------------------------------------------------------------------
+    # Raw "Total Listings" rewards judges who simply appear in more months
+    # of the dataset, not necessarily busier ones — a judge active for all
+    # 8 months naturally accumulates more listings than one active for
+    # only 2, even at the same underlying pace. Dividing by each judge's
+    # own count of active months (months where they have >=1 listing)
+    # gives a like-for-like "listings per active month" comparison.
+    with st.container(key="card_wa_tenure"):
+        section_header("Judge Workload — Adjusted for Active Tenure")
+        st.caption(
+            "Raw totals favor judges active for more months. This ranks by **listings per "
+            "active month** instead, so a judge active 2 months isn't compared unfairly "
+            "against one active all 8 — judges with only 1 active month are excluded "
+            "(a single month's count isn't a meaningful 'rate')."
+        )
+        if total_judges:
+            active_months = df_jx.dropna(subset=["Judge_List"]).groupby("Judge_List")["Year_Month"].nunique()
+            tenure_df = pd.DataFrame({
+                "Total_Listings": j_counts,
+                "Active_Months": active_months,
+            }).dropna()
+            tenure_df = tenure_df[tenure_df["Active_Months"] >= 2]
+            tenure_df["Listings_Per_Month"] = tenure_df["Total_Listings"] / tenure_df["Active_Months"]
+            tenure_df = tenure_df.sort_values("Listings_Per_Month", ascending=False).head(15)
+
+            if len(tenure_df):
+                labels = [
+                    f"{clean_judge_label(j)} ({int(row.Active_Months)}mo)"
+                    for j, row in tenure_df.iterrows()
+                ]
+                fig = gradient_bar(
+                    labels, tenure_df["Listings_Per_Month"].round(0).tolist(),
+                    color=COLORS["accent_tertiary"], orientation="h",
+                )
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
+            else:
+                st.info("No judges with 2+ active months in the current selection.")
+        else:
+            st.info("No judge data available for current filters.")
 
     st.write("")
 
