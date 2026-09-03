@@ -58,6 +58,52 @@ def render():
     st.write("")
 
     # ---------------------------------------------------------------------
+    # 1b. BENCHES WITHIN EACH COURT — always-visible, per-court breakdown
+    # ---------------------------------------------------------------------
+    # The charts below this point rank bench locations globally (top-10
+    # across all 5 courts combined), so a smaller court's own benches can
+    # get buried under Lahore's much larger ones and become hard to find.
+    # This section instead shows every bench, grouped clearly under its
+    # own court, so "what benches does Peshawar have and how busy is
+    # each one" is answered directly without digging through a filter.
+    with st.container(key="card_bd_per_court"):
+        section_header("Benches Within Each Court")
+        if total_cases:
+            df_jx_all = df.explode("Judge_List")
+            df_jx_all["Judge_List"] = df_jx_all["Judge_List"].replace("", pd.NA)
+
+            courts_present = [c for c in COURTS_ORDER if c in df["Court"].unique()]
+            cols = st.columns(min(len(courts_present), 3)) if courts_present else []
+            for i, court in enumerate(courts_present):
+                with cols[i % len(cols)]:
+                    court_color = COURT_COLORS.get(court, COLORS["accent_primary"])
+                    st.markdown(
+                        f"<div style='background:{court_color};border-radius:8px;padding:6px 12px;"
+                        f"margin-bottom:8px;text-align:center;'>"
+                        f"<span style='color:#FFFFFF;font-weight:700;font-size:0.85rem;'>{court} High Court</span></div>",
+                        unsafe_allow_html=True
+                    )
+                    cdf = df[df["Court"] == court].copy()
+                    cdf["Bench_Location"] = cdf["Bench_Location"].fillna(court)
+                    bench_stats = (
+                        cdf.groupby("Bench_Location")
+                        .size()
+                        .reset_index(name="Listings")
+                        .sort_values("Listings", ascending=False)
+                    )
+                    cdf_jx = df_jx_all[df_jx_all["Court"] == court].copy()
+                    cdf_jx["Bench_Location"] = cdf_jx["Bench_Location"].fillna(court)
+                    judges_per_bench = cdf_jx.groupby("Bench_Location")["Judge_List"].nunique()
+                    bench_stats["Judges"] = bench_stats["Bench_Location"].map(judges_per_bench).fillna(0).astype(int)
+                    bench_stats.columns = ["Bench", "Listings", "Judges"]
+                    st.dataframe(bench_stats, width='stretch', hide_index=True)
+                    st.caption(f"{len(bench_stats)} bench{'es' if len(bench_stats) != 1 else ''}")
+        else:
+            st.info("No data for current filters.")
+
+    st.write("")
+
+    # ---------------------------------------------------------------------
     # 2. TOP BENCHES LEADERBOARD & BENCH TYPES
     # ---------------------------------------------------------------------
     c1, c2 = st.columns([1.3, 1])
@@ -135,7 +181,7 @@ def render():
                 bench_summary = (
                     df.groupby(["Bench_Location", "Court"])
                     .agg(
-                        Total_Listings=("Case_No", "count"),
+                        Total_Listings=("Bench_Location", "size"),
                         Court_Rooms=("Court_Room", "nunique"),
                         Top_Category=("Case_Category", lambda x: x.mode().iloc[0] if len(x.mode()) else "N/A")
                     )
