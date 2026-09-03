@@ -51,6 +51,19 @@ def load_master_data() -> pd.DataFrame:
         df["Case_No"].astype(str)
     )
 
+    # Dashboard scope is High Court benches only — Services/Customs/Election
+    # Tribunals attached to a High Court are separate quasi-judicial forums,
+    # not part of the High Court's own case docket, and were excluded by
+    # design decision. A small number of tribunal rows leaked into the raw
+    # scrape (e.g. "Election Tribunal, Quetta" in Bench_Location, and an
+    # "Election_Tribunal_" Bench_Type at Peshawar) — drop them here so they
+    # never silently reappear in a count/chart.
+    _tribunal_mask = (
+        df["Bench_Location"].astype(str).str.contains("Tribunal", case=False, na=False) |
+        df["Bench_Type"].astype(str).str.contains("Tribunal", case=False, na=False)
+    )
+    df = df[~_tribunal_mask].reset_index(drop=True)
+
     # Each court records Case_Category in its own free-text format, so the
     # same subject matter (e.g. banking litigation) can appear as dozens of
     # different raw strings across courts ("BANKING", "Civil - COS(B) -
