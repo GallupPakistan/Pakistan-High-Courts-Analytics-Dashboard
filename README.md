@@ -30,6 +30,10 @@ Dono ke baad `pip install -r requirements.txt` (agar `layers` icon already `comp
 
 7. **Silent error logging** (`app.py`) — pehle har view ka error chup ke generic "No Data Found" card mein convert ho jata tha — matlab agar code mein koi real bug ho, wo bhi "no data" jaisa dikhta tha. Ab traceback server console/logs mein print hota hai (user ko wahi friendly card dikhta hai), taake debugging mein asaan ho.
 
+8. **Judge workload — combined-bench strings split into real judges** (`utils/data_loader.py`, plus `views/overview.py`, `views/workload_analysis.py`, `views/bench_division.py`, `views/compare_courts.py`, `views/court_details.py`) — ~17% of listings (55,000+ rows) have a "Judge" field that's actually **2–5 judges combined into one string** (Division/Full/Larger Bench sittings), e.g. `"Mr. Justice X | Mr. Justice Y | [ Court 3 ]"`. Treating this as "one judge" undercounted the real number of judges (was showing 241, actually **119**) and split a single judge's true workload across multiple fake entries (highest workload was showing 13,556, actually **22,492** for the real busiest judge). A new `Judge_List` column now holds the correctly parsed individual judge name(s) per row, and every judge-count/workload chart across the dashboard uses it.
+
+9. **Wording fixes** — "Total Cases" language in Key Insights / bench insights that leaked through as "cases"/"listed cases" now consistently says "listings" (matches the Total Listings vs Unique Cases distinction from fix #3). Also fixed the Bench Type Distribution donut silently dropping rows past the top 6 categories (now bundles the rest into "Others", matching how Case Category Distribution already worked) — its center total was showing 319,747 instead of the true 319,750.
+
 ---
 
 ## Verified
