@@ -138,6 +138,58 @@ def render():
     st.write("")
 
     # ---------------------------------------------------------------------
+    # 4c. DETECTED ANOMALIES — per-court, computed only across each
+    # court's own consecutive ACTIVE months (never across a known
+    # coverage gap, so this doesn't just re-flag the scraping-window
+    # artifact already surfaced by the warning above as a fake anomaly).
+    # ---------------------------------------------------------------------
+    with st.container(key="card_tot_anomaly"):
+        section_header("Detected Anomalies (Month-over-Month, Per Court)")
+        st.caption(
+            "Flags month-to-month swings larger than **±50%** within each court's own active "
+            "months — comparisons only ever happen between two consecutive months where that "
+            "specific court actually has data, so a known coverage gap can't itself be flagged "
+            "as an anomaly."
+        )
+        if total_cases:
+            anomalies = []
+            for court in COURTS_ORDER:
+                cdf = df[df["Court"] == court].dropna(subset=["Year_Month"])
+                if not len(cdf):
+                    continue
+                court_monthly = cdf.groupby("Year_Month").size().sort_index()
+                if len(court_monthly) < 2:
+                    continue
+                pct = court_monthly.pct_change() * 100
+                for month, change in pct.items():
+                    if pd.notna(change) and abs(change) >= 50:
+                        idx = list(court_monthly.index).index(month)
+                        prev_month = court_monthly.index[idx - 1]
+                        anomalies.append({
+                            "Court": court,
+                            "Month": str(month),
+                            "Previous Month": str(prev_month),
+                            "Change": f"{'+' if change >= 0 else ''}{change:.0f}%",
+                            "Listings": int(court_monthly[month]),
+                            "Direction": "📈 Spike" if change >= 0 else "📉 Drop",
+                        })
+            if anomalies:
+                anomaly_df = pd.DataFrame(anomalies).sort_values("Court")
+                st.dataframe(anomaly_df, width='stretch', hide_index=True)
+                st.caption(
+                    f"{len(anomaly_df)} anomal{'y' if len(anomaly_df)==1 else 'ies'} detected. "
+                    "A spike/drop here may still reflect a partial month, a bench coming online "
+                    "mid-period, or a genuine change in listing activity — check the underlying "
+                    "month before drawing conclusions."
+                )
+            else:
+                st.info("No month-over-month swings beyond ±50% detected within any single court's active months.")
+        else:
+            st.info("No data for current filters.")
+
+    st.write("")
+
+    # ---------------------------------------------------------------------
     # 4b. YEAR-OVER-YEAR VOLUME — VISUAL (grouped bar by court)
     # ---------------------------------------------------------------------
     with st.container(key="card_tot_7"):
