@@ -4,6 +4,7 @@ Uses st.container(key="card_cd_N") for card sections.
 """
 
 import streamlit as st
+import pandas as pd
 import sys
 import os
 
@@ -33,7 +34,7 @@ def render():
     st.write("")
 
     total_cases  = len(df)
-    total_judges = df["Judge"].nunique()          if total_cases else 0
+    total_judges = df.explode('Judge_List')['Judge_List'].replace('', pd.NA).nunique() if total_cases else 0
     total_benches = df["Bench_Location"].nunique() if total_cases else 0
     total_cats    = df["Case_Category"].nunique()  if total_cases else 0
     pct_of_all    = (total_cases / len(df_all) * 100) if len(df_all) else 0
@@ -84,7 +85,7 @@ def render():
     with st.container(key="card_cd_4"):
         section_header(f"Top 10 Most Active Judges — {sel_court}")
         if total_cases:
-            top_j = df["Judge"].value_counts().dropna().head(10)
+            top_j = df.explode('Judge_List')['Judge_List'].replace('', pd.NA).dropna().value_counts().head(10)
             judge_labels = [clean_judge_label(j) for j in top_j.index.tolist()]
             fig   = gradient_bar(judge_labels, top_j.values.tolist(), color=COLORS["accent_secondary"], orientation="h", height=420)
             st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
@@ -128,12 +129,14 @@ def render():
             top_b  = df["Bench_Location"].value_counts().idxmax()
             top_b_cnt = df["Bench_Location"].value_counts().max()
             insight_pill(icon("map-pin", size=16, color=COLORS["accent_primary"]),
-                         f"Principal seat: <b>{top_b}</b> with {top_b_cnt:,} listed cases.")
+                         f"Principal seat: <b>{top_b}</b> with {top_b_cnt:,} listings.")
             top_c  = df["Case_Category"].value_counts().idxmax()
             insight_pill(icon("tags", size=16, color=COLORS["warning"]),
                          f"Dominant category: <b>{top_c}</b> ({df['Case_Category'].value_counts().max():,} listings).")
-            top_j  = df["Judge"].value_counts().dropna().idxmax()
-            insight_pill(icon("gavel", size=16, color=COLORS["accent_secondary"]),
-                         f"Most-listed judge: <b>{clean_judge_label(top_j)}</b> ({df['Judge'].value_counts().dropna().max():,} listings).")
+            judge_vc = df.explode('Judge_List')['Judge_List'].replace('', pd.NA).dropna().value_counts()
+            if len(judge_vc):
+                top_j = judge_vc.idxmax()
+                insight_pill(icon("gavel", size=16, color=COLORS["accent_secondary"]),
+                             f"Most-listed judge: <b>{clean_judge_label(top_j)}</b> ({judge_vc.max():,} listings).")
         else:
             st.info("No data for current filters.")
