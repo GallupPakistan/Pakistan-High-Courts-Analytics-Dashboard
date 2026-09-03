@@ -200,7 +200,7 @@ def render():
         section_header("Temporal Insights")
 
         if total_months:
-            insight_pill(icon("calendar", size=16, color=COLORS["accent_primary"]), f"Highest single-month listing activity recorded in <b>{peak_month}</b> with {peak_vol:,} cases.")
+            insight_pill(icon("calendar", size=16, color=COLORS["accent_primary"]), f"Highest single-month listing activity recorded in <b>{peak_month}</b> with {peak_vol:,} listings.")
             insight_pill(icon("trending-up", size=16, color=COLORS["accent_secondary"]), f"Average monthly throughput across selected courts is <b>{avg_monthly:,.0f} listings</b> per month.")
         else:
             st.info("No data for current filters.")
