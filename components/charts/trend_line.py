@@ -55,6 +55,7 @@ def glow_trend(x, series: dict, colors: dict = None, height=380, fill=True):
     layout = get_plotly_layout_defaults()
     layout["height"] = height
     layout["hovermode"] = "x unified"
+    layout["xaxis"] = {**layout.get("xaxis", {}), "type": "category"}
     fig.update_layout(**layout)
     return fig
 
