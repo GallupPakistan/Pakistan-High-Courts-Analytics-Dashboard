@@ -11,6 +11,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from styles.theme import COLORS, COURT_COLORS  # noqa: E402
 from utils.data_loader import load_master_data, apply_filters, COURTS_ORDER  # noqa: E402
+from utils.data_quality import find_coverage_gaps  # noqa: E402
 from components.filters import render_filter_bar  # noqa: E402
 from components.kpi_cards import render_kpi_row, section_header, insight_pill, simple_kpi_card  # noqa: E402
 from components.charts.bar_chart import gradient_bar  # noqa: E402
@@ -31,10 +32,24 @@ def render():
 
     df = apply_filters(df_all, **filters)
 
+    if sel_court == "All Courts":
+        gaps = find_coverage_gaps(df, COURTS_ORDER)
+        if gaps:
+            st.warning(
+                f"⚠️ **Uneven data coverage** — {len(gaps)} court(s) are missing listings for "
+                "some months, which can distort the combined Monthly Cause-List Trend below. "
+                "See the **Trends Over Time** page for the exact gap, or select a single court above."
+            )
+
+    # Explode combined-bench Judge_List ONCE and reuse it below — this page
+    # needed it in 3 separate places before.
+    df_jx = df.explode("Judge_List")
+    df_jx["Judge_List"] = df_jx["Judge_List"].replace("", pd.NA)
+
     st.write("")
 
     total_cases  = len(df)
-    total_judges = df.explode('Judge_List')['Judge_List'].replace('', pd.NA).nunique() if total_cases else 0
+    total_judges = df_jx["Judge_List"].nunique() if total_cases else 0
     total_benches = df["Bench_Location"].nunique() if total_cases else 0
     total_cats    = df["Case_Category"].nunique()  if total_cases else 0
     pct_of_all    = (total_cases / len(df_all) * 100) if len(df_all) else 0
@@ -85,7 +100,7 @@ def render():
     with st.container(key="card_cd_4"):
         section_header(f"Top 10 Most Active Judges — {sel_court}")
         if total_cases:
-            top_j = df.explode('Judge_List')['Judge_List'].replace('', pd.NA).dropna().value_counts().head(10)
+            top_j = df_jx["Judge_List"].dropna().value_counts().head(10)
             judge_labels = [clean_judge_label(j) for j in top_j.index.tolist()]
             fig   = gradient_bar(judge_labels, top_j.values.tolist(), color=COLORS["accent_secondary"], orientation="h", height=420)
             st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
@@ -97,13 +112,16 @@ def render():
     with st.container(key="card_cd_5"):
         section_header("Bench Type Mix")
         if total_cases:
-            bt = df["Bench_Type_Group"].value_counts().head(5)
+            top_bt   = df["Bench_Type_Group"].value_counts().head(5)
+            other_bt = df["Bench_Type_Group"].value_counts().iloc[5:].sum()
+            bt_labels = top_bt.index.tolist() + (["Others"] if other_bt > 0 else [])
+            bt_values = top_bt.values.tolist() + ([other_bt] if other_bt > 0 else [])
             rc1, rc2 = st.columns([1.1, 1])
             with rc1:
-                fig = futuristic_radial(bt.index.tolist(), bt.values.tolist(), center_label="Formations", center_value=f"{bt.sum():,}", height=240)
+                fig = futuristic_radial(bt_labels, bt_values, center_label="Formations", center_value=f"{sum(bt_values):,}", height=240)
                 st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             with rc2:
-                st.markdown(radial_legend_html(bt.index.tolist(), bt.values.tolist()), unsafe_allow_html=True)
+                st.markdown(radial_legend_html(bt_labels, bt_values), unsafe_allow_html=True)
         else:
             st.info("No data for current filters.")
 
@@ -133,7 +151,7 @@ def render():
             top_c  = df["Case_Category"].value_counts().idxmax()
             insight_pill(icon("tags", size=16, color=COLORS["warning"]),
                          f"Dominant category: <b>{top_c}</b> ({df['Case_Category'].value_counts().max():,} listings).")
-            judge_vc = df.explode('Judge_List')['Judge_List'].replace('', pd.NA).dropna().value_counts()
+            judge_vc = df_jx["Judge_List"].dropna().value_counts()
             if len(judge_vc):
                 top_j = judge_vc.idxmax()
                 insight_pill(icon("gavel", size=16, color=COLORS["accent_secondary"]),
