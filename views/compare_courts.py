@@ -35,7 +35,7 @@ def _court_kpi_col(col, court_name: str, cdf: pd.DataFrame, total_all: int, card
             c_pct      = (c_total / total_all * 100) if total_all else 0
             metrics    = [
                 ("Total Listings",  f"{c_total:,}",                f"{c_pct:.1f}% of selection"),
-                ("Active Judges",   f"{cdf['Judge'].nunique():,}",  "Distinct on record"),
+                ("Active Judges",   f"{cdf.explode('Judge_List')['Judge_List'].replace('', pd.NA).nunique():,}",  "Distinct on record"),
                 ("Bench Locations", f"{cdf['Bench_Location'].nunique():,}", "Seats / divisions"),
                 (f"Top {cat_label}", cdf[cat_col].value_counts().idxmax() if c_total else "N/A", "Most-listed"),
                 ("Busiest Bench",   cdf["Bench_Location"].value_counts().idxmax() if cdf["Bench_Location"].nunique() else "N/A", "Highest-volume seat"),
@@ -224,7 +224,7 @@ def render():
         {"icon": icon("landmark",    size=20, color=COLORS["accent_primary"]),   "label": "Active Courts",   "value": f"{active_courts}",          "sub": "In selection"},
         {"icon": icon("folder",      size=20, color=COLORS["accent_secondary"]), "label": "Total Listings",  "value": f"{total_cases:,}",          "sub": f"Avg {avg_per_court:,.0f} / court"},
         {"icon": icon("trending-up", size=20, color=COLORS["accent_tertiary"]),  "label": "Largest Volume",  "value": f"{top_court}",              "sub": f"{top_court_cases:,} listings"},
-        {"icon": icon("gavel",       size=20, color=COLORS["warning"]),           "label": "Total Judges",    "value": f"{df['Judge'].nunique():,}" if total_cases else "0", "sub": "Across courts"},
+        {"icon": icon("gavel",       size=20, color=COLORS["warning"]),           "label": "Total Judges",    "value": f"{df.explode('Judge_List')['Judge_List'].replace('', pd.NA).nunique():,}" if total_cases else "0", "sub": "Across courts"},
         {"icon": icon("tags",        size=20, color=COLORS["success"]),           "label": f"{cat_label}s",   "value": f"{df[cat_col].nunique():,}" if total_cases else "0", "sub": "Listed"},
     ])
 
@@ -294,7 +294,7 @@ def render():
             for court in COURTS_ORDER:
                 cdf = df[df["Court"] == court]
                 if len(cdf):
-                    j   = cdf["Judge"].nunique()
+                    j   = cdf.explode('Judge_List')['Judge_List'].replace('', pd.NA).nunique()
                     avg = len(cdf) / j if j else 0
                     court_summary.append({
                         "Court": court, "Total Listings": len(cdf),
@@ -333,7 +333,7 @@ def render():
                 ratio  = vol_counts.max() / vol_counts.min() if vol_counts.min() > 0 else 0
                 insight_pill(icon("trending-up", size=16, color=COLORS["accent_primary"]),
                              f"Volume gap: <b>{mx}</b> has {ratio:.1f}x more listings than <b>{mn}</b>.")
-            j_loads = {c: len(df[df["Court"]==c]) / max(df[df["Court"]==c]["Judge"].nunique(), 1)
+            j_loads = {c: len(df[df["Court"]==c]) / max(df[df["Court"]==c].explode('Judge_List')['Judge_List'].replace('', pd.NA).nunique(), 1)
                        for c in COURTS_ORDER if len(df[df["Court"]==c]) > 0}
             if j_loads:
                 hj = max(j_loads, key=j_loads.get)
