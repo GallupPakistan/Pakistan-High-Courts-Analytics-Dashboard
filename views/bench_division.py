@@ -25,6 +25,7 @@ from components.charts.donut_chart import futuristic_radial, radial_legend_html 
 from components.charts.trend_line import glow_trend  # noqa: E402
 from components.top_bar import render_top_bar  # noqa: E402
 from components.icons import icon  # noqa: E402
+from utils.formatting import clean_court_room_label  # noqa: E402
 
 
 def render():
@@ -75,13 +76,16 @@ def render():
         with st.container(key="card_bd_2"):
             section_header("Bench Type Formations")
             if total_cases:
-                bt = df["Bench_Type_Group"].value_counts().head(5)
+                top_bt = df["Bench_Type_Group"].value_counts().head(5)
+                other_bt = df["Bench_Type_Group"].value_counts().iloc[5:].sum()
+                bt_labels = top_bt.index.tolist() + (["Others"] if other_bt > 0 else [])
+                bt_values = top_bt.values.tolist() + ([other_bt] if other_bt > 0 else [])
                 rc1, rc2 = st.columns([1.1, 1])
                 with rc1:
-                    fig = futuristic_radial(bt.index.tolist(), bt.values.tolist(), center_label="Formations", center_value=f"{bt.sum():,}", height=240)
+                    fig = futuristic_radial(bt_labels, bt_values, center_label="Formations", center_value=f"{sum(bt_values):,}", height=240)
                     st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
                 with rc2:
-                    st.markdown(radial_legend_html(bt.index.tolist(), bt.values.tolist()), unsafe_allow_html=True)
+                    st.markdown(radial_legend_html(bt_labels, bt_values), unsafe_allow_html=True)
             else:
                 st.info("No data for current filters.")
 
@@ -114,7 +118,8 @@ def render():
             section_header("Top Active Court Rooms")
             if total_cases:
                 rooms = df["Court_Room"].value_counts().dropna().head(8)
-                fig = gradient_bar(rooms.index.tolist(), rooms.values.tolist(), color=COLORS["accent_secondary"])
+                clean_labels = [clean_court_room_label(r) for r in rooms.index.tolist()]
+                fig = gradient_bar(clean_labels, rooms.values.tolist(), color=COLORS["accent_secondary"])
                 st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
                 st.info("No data for current filters.")
@@ -123,18 +128,23 @@ def render():
         with st.container(key="card_bd_5"):
             section_header("Bench Location Summary Table")
             if total_cases:
+                df_jx_bd = df.explode("Judge_List")
+                df_jx_bd["Judge_List"] = df_jx_bd["Judge_List"].replace("", pd.NA)
+                judges_per_bl = df_jx_bd.groupby("Bench_Location")["Judge_List"].nunique()
+
                 bench_summary = (
                     df.groupby(["Bench_Location", "Court"])
                     .agg(
                         Total_Listings=("Case_No", "count"),
-                        Judges=("Judge", "nunique"),
                         Court_Rooms=("Court_Room", "nunique"),
                         Top_Category=("Case_Category", lambda x: x.mode().iloc[0] if not x.empty else "N/A")
                     )
                     .reset_index()
-                    .sort_values("Total_Listings", ascending=False)
-                    .head(10)
                 )
+                bench_summary["Judges"] = bench_summary["Bench_Location"].map(judges_per_bl).fillna(0).astype(int)
+                bench_summary = bench_summary[
+                    ["Bench_Location", "Court", "Total_Listings", "Judges", "Court_Rooms", "Top_Category"]
+                ].sort_values("Total_Listings", ascending=False).head(10)
                 st.dataframe(bench_summary, width='stretch', hide_index=True)
             else:
                 st.info("No data for current filters.")
