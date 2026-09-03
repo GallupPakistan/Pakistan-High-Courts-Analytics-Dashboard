@@ -6,6 +6,7 @@ glass-card pattern which creates always-empty divs).
 """
 
 import streamlit as st
+import pandas as pd
 import sys
 import os
 
