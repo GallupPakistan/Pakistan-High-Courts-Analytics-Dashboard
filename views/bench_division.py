@@ -150,7 +150,9 @@ def render():
         with st.container(key="card_bd_7"):
             section_header("Active Judges per Bench Location")
             if total_cases:
-                judges_per_bench = df.groupby("Bench_Location")["Judge"].nunique().sort_values(ascending=False).head(10)
+                exploded = df.explode("Judge_List")
+                exploded = exploded[exploded["Judge_List"].notna() & (exploded["Judge_List"] != "")]
+                judges_per_bench = exploded.groupby("Bench_Location")["Judge_List"].nunique().sort_values(ascending=False).head(10)
                 fig = gradient_bar(judges_per_bench.index.tolist(), judges_per_bench.values.tolist(), color=COLORS["accent_tertiary"], orientation="h")
                 st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
             else:
