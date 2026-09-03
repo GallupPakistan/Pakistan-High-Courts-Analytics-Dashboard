@@ -23,6 +23,7 @@ from components.icons import icon
 NAV_SECTIONS = [
     (None, [
         ("Overview", "space_dashboard"),
+        ("Case Search", "search"),
     ]),
     ("COMPARISON", [
         ("Compare Courts", "compare_arrows"),
