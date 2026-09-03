@@ -9,6 +9,7 @@ re-reading from disk.
 import streamlit as st
 import pandas as pd
 import os
+import re
 
 from utils.category_normalizer import add_normalized_category
 from utils.bench_type_normalizer import add_normalized_bench_type
@@ -81,6 +82,27 @@ def load_master_data() -> pd.DataFrame:
     # type's volume across look-alike labels. See
     # utils/bench_type_normalizer.py for the mapping rules.
     df = add_normalized_bench_type(df, source_col="Bench_Type", target_col="Bench_Type_Group")
+
+    # The raw "Judge" field is not always a single judge's name — for
+    # Division/Full/Larger Bench sittings, the cause-list header lists every
+    # judge on that bench joined together in one string, e.g.
+    # "Mr. Justice X | Mr. Justice Y | [ Justice ... Block - Court 3 ]".
+    # ~17% of listings (55k+ rows) are such combined strings. Treating the
+    # whole string as "one judge" both undercounts the true number of
+    # distinct judges and misattributes workload (a 2-judge listing should
+    # count toward both judges' caseload, not neither/one). Judge_List
+    # splits the courtroom/block tag off and parses out the individual
+    # judge name(s) as a list, for accurate per-judge workload analysis.
+    # Use df.explode("Judge_List") wherever counting listings *per judge*;
+    # keep using the original "Judge" column/row count for Total Listings.
+    def _parse_judges(raw):
+        if pd.isna(raw):
+            return []
+        judges_part = re.split(r"\s*\[", str(raw))[0]
+        names = re.split(r"\s*\|\s*|\s+&\s+", judges_part)
+        return [n.strip() for n in names if n.strip()]
+
+    df["Judge_List"] = df["Judge"].apply(_parse_judges)
 
     return df
 
