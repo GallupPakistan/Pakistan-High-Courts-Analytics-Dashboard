@@ -103,6 +103,9 @@ def _render_page(render_fn, page_label: str):
 if active_page == "Overview":
     from views.overview import render as render_overview
     _render_page(render_overview, "Overview")
+elif active_page == "Case Search":
+    from views.case_search import render as render_case_search
+    _render_page(render_case_search, "Case Search")
 elif active_page == "Compare Courts":
     from views.compare_courts import render as render_compare_courts
     _render_page(render_compare_courts, "Compare Courts")
