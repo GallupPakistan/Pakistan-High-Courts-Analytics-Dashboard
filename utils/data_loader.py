@@ -51,6 +51,16 @@ def load_master_data() -> pd.DataFrame:
         df["Bench_Location"].fillna("").astype(str) + "||" +
         df["Case_No"].astype(str)
     )
+    # For ~60% of Islamabad's rows, Case_No is actually the cause-list
+    # serial/position number for that day (e.g. "1", "2", "3") rather than
+    # the case's real registration number, and Islamabad has no
+    # Bench_Location to help disambiguate — so unrelated cases collide
+    # under the same Case_UID. Fold in Case_Title for these bare-number
+    # rows so genuinely different cases aren't merged into one.
+    _bare_case_no = df["Case_No"].astype(str).str.match(r"^\d{1,3}$")
+    df.loc[_bare_case_no, "Case_UID"] = (
+        df.loc[_bare_case_no, "Case_UID"] + "||" + df.loc[_bare_case_no, "Case_Title"].fillna("").astype(str)
+    )
 
     # Dashboard scope is High Court benches only — Services/Customs/Election
     # Tribunals attached to a High Court are separate quasi-judicial forums,
@@ -99,7 +109,7 @@ def load_master_data() -> pd.DataFrame:
         if pd.isna(raw):
             return []
         judges_part = re.split(r"\s*\[", str(raw))[0]
-        names = re.split(r"\s*\|\s*|\s+&\s+", judges_part)
+        names = re.split(r"\s*\|\s*|\s+&\s+|\s*,?\s*;\s*", judges_part)
         return [n.strip() for n in names if n.strip()]
 
     df["Judge_List"] = df["Judge"].apply(_parse_judges)
