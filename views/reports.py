@@ -17,7 +17,8 @@ import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from styles.theme import COLORS  # noqa: E402
-from utils.data_loader import load_master_data, apply_filters  # noqa: E402
+from utils.data_loader import load_master_data, apply_filters, COURTS_ORDER  # noqa: E402
+from utils.data_quality import find_coverage_gaps  # noqa: E402
 from components.filters import render_filter_bar  # noqa: E402
 from components.kpi_cards import render_kpi_row, section_header, insight_pill  # noqa: E402
 from components.charts.bar_chart import gradient_bar  # noqa: E402
@@ -32,6 +33,19 @@ def render():
     df_all = load_master_data()
     filters = render_filter_bar(df_all, key_prefix="rep")
     df = apply_filters(df_all, **filters)
+
+    # The working dataframe carries several internal/derived columns
+    # (Case_UID for de-duplication logic, Judge_List as a Python list
+    # object) that aren't meant for an external data export — Judge_List
+    # in particular renders as raw Python repr() syntax in CSV
+    # ("['Justice X', 'Justice Y']"), which is broken for any real
+    # spreadsheet/analysis use. The export/preview/schema-summary below
+    # use this curated column set: the 16 original raw fields plus the
+    # two normalized enrichment columns (Category_Group, Bench_Type_Group)
+    # that are genuinely useful for external analysis.
+    _exclude_cols = {"Case_UID", "Judge_List"}
+    export_cols = [c for c in df.columns if c not in _exclude_cols]
+    df = df[export_cols]
 
     st.write("")
 
@@ -70,6 +84,12 @@ def render():
     with ec2:
         with st.container(key="card_rep_5"):
             section_header("Matching Records — Monthly Volume")
+            gaps = find_coverage_gaps(df, COURTS_ORDER)
+            if gaps:
+                st.caption(
+                    f"⚠️ {len(gaps)} court(s) are missing listings for some months in this selection — "
+                    "monthly totals mix courts with different scrape windows. See Trends Over Time for the exact gap."
+                )
             month_counts = df.dropna(subset=["Year_Month"]).groupby("Year_Month").size().sort_index()
             if len(month_counts):
                 fig = glow_trend(month_counts.index.tolist(), {"Records": month_counts.values.tolist()}, colors={"Records": COLORS["accent_secondary"]}, height=300)
@@ -91,7 +111,8 @@ def render():
             st.markdown(
                 "<div style='color:#A9BBDD;font-size:0.9rem;line-height:1.5;'>"
                 "Export the currently filtered subset of cause-list records in CSV format. "
-                "The download contains all 16 unified schema attributes, suitable for external statistical analysis or Excel processing."
+                f"The download contains all {len(export_cols)} unified schema attributes (including normalized "
+                "category and bench-type groupings), suitable for external statistical analysis or Excel processing."
                 "</div>",
                 unsafe_allow_html=True
             )
