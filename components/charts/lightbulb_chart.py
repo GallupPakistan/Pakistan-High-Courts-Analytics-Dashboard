@@ -129,7 +129,7 @@ def _detail_card(cat, color, align="left"):
     label = cat["label"]
     desc = cat.get("desc", "")
     count = cat.get("count")
-    sub = f'{count:,} cases &middot; {pct:.0f}%' if count is not None else f'{pct:.0f}%'
+    sub = f'{count:,} listings &middot; {pct:.0f}%' if count is not None else f'{pct:.0f}%'
     ic = _icon(cat.get("icon", "info"), size=18, color=color)
 
     text_align = "right" if align == "right" else "left"
