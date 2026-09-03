@@ -62,7 +62,7 @@ def render():
     # 1. JUDICIAL WORKLOAD KPI ROW
     # ---------------------------------------------------------------------
     total_cases = len(df)
-    j_counts = df["Judge"].value_counts().dropna()
+    j_counts = df.explode("Judge_List")["Judge_List"].replace("", pd.NA).dropna().value_counts()
     total_judges = len(j_counts)
     avg_load = j_counts.mean() if total_judges else 0
     median_load = j_counts.median() if total_judges else 0
@@ -135,9 +135,10 @@ def render():
         if total_judges:
             top_5_j = j_counts.head(5).index.tolist()
             j_trend = (
-                df[df["Judge"].isin(top_5_j)]
+                df.explode("Judge_List")[df.explode("Judge_List")["Judge_List"].isin(top_5_j)]
                 .dropna(subset=["Year_Month"])
-                .groupby(["Year_Month", "Judge"]).size().reset_index(name="Listings")
+                .groupby(["Year_Month", "Judge_List"]).size().reset_index(name="Listings")
+                .rename(columns={"Judge_List": "Judge"})
             )
             pivot_j = j_trend.pivot(index="Year_Month", columns="Judge", values="Listings").fillna(0).sort_index()
             # Use short, de-duplicated labels for the legend instead of the
@@ -184,11 +185,13 @@ def render():
             for court in COURTS_ORDER:
                 cdf = df[df["Court"] == court]
                 if len(cdf):
-                    j_cnt = cdf["Judge"].nunique()
+                    cdf_j = cdf.explode("Judge_List")["Judge_List"].replace("", pd.NA).dropna()
+                    j_cnt = cdf_j.nunique()
                     total_l = len(cdf)
                     avg_l = total_l / j_cnt if j_cnt else 0
-                    max_j = cdf["Judge"].value_counts().max() if j_cnt else 0
-                    busiest = cdf["Judge"].value_counts().idxmax() if j_cnt else "N/A"
+                    j_vc = cdf_j.value_counts()
+                    max_j = j_vc.max() if j_cnt else 0
+                    busiest = j_vc.idxmax() if j_cnt else "N/A"
                     j_court_stats.append({
                         "Court": court,
                         "Active Judges": j_cnt,
