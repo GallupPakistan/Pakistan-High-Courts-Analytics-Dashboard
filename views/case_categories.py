@@ -27,6 +27,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from styles.theme import COLORS, COURT_COLORS  # noqa: E402
 from utils.data_loader import load_master_data, apply_filters, COURTS_ORDER  # noqa: E402
+from utils.data_quality import find_coverage_gaps  # noqa: E402
 from components.filters import render_filter_bar  # noqa: E402
 from components.kpi_cards import render_kpi_row, section_header, insight_pill, simple_kpi_card  # noqa: E402
 from components.charts.bar_chart import gradient_bar, grouped_bar  # noqa: E402
@@ -88,7 +89,7 @@ def render():
 
     render_kpi_row([
         {"icon": icon("tags", size=20, color=COLORS["accent_primary"]), "label": f"Distinct {cat_label}s", "value": f"{total_cats:,}", "sub": "Categories listed"},
-        {"icon": icon("folder", size=20, color=COLORS["accent_secondary"]), "label": f"Top {cat_label}", "value": f"{top_cat}", "sub": f"{top_cat_vol:,} cases ({top_cat_pct:.1f}%)"},
+        {"icon": icon("folder", size=20, color=COLORS["accent_secondary"]), "label": f"Top {cat_label}", "value": f"{top_cat}", "sub": f"{top_cat_vol:,} listings ({top_cat_pct:.1f}%)"},
         {"icon": icon("landmark", size=20, color=COLORS["accent_tertiary"]), "label": "Courts Covered", "value": f"{df['Court'].nunique()}", "sub": "Courts in view"},
         {"icon": icon("gavel", size=20, color=COLORS["warning"]), "label": "Sections Cited", "value": f"{df['Section'].nunique():,}" if total_cases else "0", "sub": "Distinct law sections"},
         {"icon": icon("calendar", size=20, color=COLORS["success"]), "label": "Total Listings", "value": f"{total_cases:,}", "sub": "Filtered volume"},
@@ -195,10 +196,10 @@ def render():
         with st.container(key="card_catg_7"):
             section_header(f"Top {cat_label}s by Bench Type")
             if total_cases:
-                top_cats_bt = df[cat_col].value_counts().head(6).index.tolist()
-                top_bts = df["Bench_Type"].value_counts().head(4).index.tolist()
-                sub = df[df[cat_col].isin(top_cats_bt) & df["Bench_Type"].isin(top_bts)]
-                cat_bt_df = sub.groupby([cat_col, "Bench_Type"]).size().unstack(fill_value=0)
+                top_cats_bt = df[cat_col].value_counts().head(4).index.tolist()
+                top_bts = df["Bench_Type_Group"].value_counts().head(4).index.tolist()
+                sub = df[df[cat_col].isin(top_cats_bt) & df["Bench_Type_Group"].isin(top_bts)]
+                cat_bt_df = sub.groupby([cat_col, "Bench_Type_Group"]).size().unstack(fill_value=0)
                 series = {c: cat_bt_df[c].tolist() for c in top_bts if c in cat_bt_df.columns}
                 fig = grouped_bar(top_cats_bt, series, height=360)
                 st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
@@ -227,6 +228,13 @@ def render():
         section_header(f"Top 4 {cat_label} Listing Trends Over Time")
 
         if total_cases:
+            gaps = find_coverage_gaps(df, COURTS_ORDER)
+            if gaps:
+                st.caption(
+                    f"⚠️ {len(gaps)} court(s) are missing listings for some months in the current "
+                    "selection — the trend below mixes courts with different scrape windows, so month-"
+                    "to-month shifts may partly reflect *when data was collected*, not real category volume."
+                )
             top_4_cats = df[cat_col].value_counts().head(4).index.tolist()
             trend_cat = df[df[cat_col].isin(top_4_cats)].dropna(subset=["Year_Month"]).groupby(["Year_Month", cat_col]).size().reset_index(name="Listings")
             pivot_cat = trend_cat.pivot(index="Year_Month", columns=cat_col, values="Listings").fillna(0).sort_index()
@@ -286,15 +294,34 @@ def render():
         total_with_section = len(sec_df)
         coverage_pct = (total_with_section / total_cases * 100) if total_cases else 0
 
+        # The raw Section field mixes two very different kinds of content:
+        # genuine statutory citations (e.g. "{u/s 302 PPC}") and case-stage /
+        # procedural annotations that aren't legal sections at all (e.g.
+        # "FOR HEARING OF CASES", "FOR KATCHA PESHI", "FOR FRESH CASES").
+        # The latter repeat far more often per case and were dominating this
+        # "Top Cited Legal Sections" chart, crowding out actual citations.
+        # Keep only rows that look like a real citation (contain "u/s",
+        # "section", or "article" followed by a number, or are wrapped in
+        # "{...}" — the common raw format for genuine citations here).
+        _legal_pattern = r"\{.*u/?s.*\}|section\s*\d|u/s\s*\d|article\s*\d"
+        is_legal_citation = sec_df["Section"].astype(str).str.contains(_legal_pattern, case=False, regex=True, na=False)
+        sec_df_legal = sec_df[is_legal_citation]
+
         if total_with_section:
             st.caption(
                 f"Based on the **{total_with_section:,} listings ({coverage_pct:.1f}% of the current selection)** "
                 "that have a Section / statutory provision on file — most cause-list rows don't record one, "
-                "so this is not representative of the full filtered dataset."
+                "so this is not representative of the full filtered dataset. Of those, only "
+                f"**{len(sec_df_legal):,} ({len(sec_df_legal)/total_with_section*100:.1f}%)** look like genuine "
+                "statutory citations (e.g. '{u/s 302 PPC}') rather than case-stage notes recorded in the same "
+                "field (e.g. 'FOR HEARING OF CASES') — only those are shown below."
             )
-            top_sections = sec_df["Section"].value_counts().head(10)
-            fig = gradient_bar(top_sections.index.tolist(), top_sections.values.tolist(), color=COLORS["accent_secondary"], orientation="h")
-            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
+            if len(sec_df_legal):
+                top_sections = sec_df_legal["Section"].value_counts().head(10)
+                fig = gradient_bar(top_sections.index.tolist(), top_sections.values.tolist(), color=COLORS["accent_secondary"], orientation="h")
+                st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
+            else:
+                st.info("No genuine statutory citations found in the current filter selection.")
         else:
             st.info("No Section data available for the current filter selection.")
 
@@ -320,9 +347,9 @@ def render():
                     pct_other = len(uncategorized_note) / total_cases * 100
                     insight_pill(icon("folder", size=16, color=COLORS["warning"]), f"<b>{pct_other:.1f}%</b> of listings in the current filter fall outside the normalized mapping's rules (bucketed as \"Other / Uncategorized\" in Normalized Group view) — mostly one-off or terse labels.")
 
-            if total_with_section:
-                top_sec = sec_df["Section"].value_counts().idxmax()
-                top_sec_val = sec_df["Section"].value_counts().max()
-                insight_pill(icon("gavel", size=16, color=COLORS["accent_tertiary"]), f"Among listings with a recorded Section ({coverage_pct:.1f}% of selection), <b>{top_sec}</b> is cited most often ({top_sec_val:,} listings).")
+            if len(sec_df_legal):
+                top_sec = sec_df_legal["Section"].value_counts().idxmax()
+                top_sec_val = sec_df_legal["Section"].value_counts().max()
+                insight_pill(icon("gavel", size=16, color=COLORS["accent_tertiary"]), f"Among listings with a genuine statutory citation ({len(sec_df_legal)/total_cases*100:.1f}% of selection), <b>{top_sec}</b> is cited most often ({top_sec_val:,} listings).")
         else:
             st.info("No data for current filters.")
