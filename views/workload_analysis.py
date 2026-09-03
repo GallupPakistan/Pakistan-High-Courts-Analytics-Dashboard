@@ -61,8 +61,15 @@ def render():
     # ---------------------------------------------------------------------
     # 1. JUDICIAL WORKLOAD KPI ROW
     # ---------------------------------------------------------------------
+    # Explode combined-bench Judge_List ONCE and reuse it for every judge
+    # metric on this page — this page needed it in 4+ places before,
+    # including one line that called .explode() twice in a single
+    # expression, each one materializing a ~376k-row temporary dataframe.
+    df_jx = df.explode("Judge_List")
+    df_jx["Judge_List"] = df_jx["Judge_List"].replace("", pd.NA)
+
     total_cases = len(df)
-    j_counts = df.explode("Judge_List")["Judge_List"].replace("", pd.NA).dropna().value_counts()
+    j_counts = df_jx["Judge_List"].dropna().value_counts()
     total_judges = len(j_counts)
     avg_load = j_counts.mean() if total_judges else 0
     median_load = j_counts.median() if total_judges else 0
@@ -135,7 +142,7 @@ def render():
         if total_judges:
             top_5_j = j_counts.head(5).index.tolist()
             j_trend = (
-                df.explode("Judge_List")[df.explode("Judge_List")["Judge_List"].isin(top_5_j)]
+                df_jx[df_jx["Judge_List"].isin(top_5_j)]
                 .dropna(subset=["Year_Month"])
                 .groupby(["Year_Month", "Judge_List"]).size().reset_index(name="Listings")
                 .rename(columns={"Judge_List": "Judge"})
@@ -185,7 +192,7 @@ def render():
             for court in COURTS_ORDER:
                 cdf = df[df["Court"] == court]
                 if len(cdf):
-                    cdf_j = cdf.explode("Judge_List")["Judge_List"].replace("", pd.NA).dropna()
+                    cdf_j = df_jx.loc[df_jx["Court"] == court, "Judge_List"].dropna()
                     j_cnt = cdf_j.nunique()
                     total_l = len(cdf)
                     avg_l = total_l / j_cnt if j_cnt else 0
@@ -244,17 +251,20 @@ def render():
     # 6. CASE RECURRENCE / LISTING FREQUENCY ANALYSIS (backlog proxy)
     # ---------------------------------------------------------------------
     # Cause lists don't record disposal dates, so how many times the same
-    # Case_No re-appears across hearing dates is the dashboard's proxy for
+    # case re-appears across hearing dates is the dashboard's proxy for
     # backlog / case churn (see views/about.py). This section makes that
     # metric visible instead of only stating it as a methodology note.
-    case_counts = df["Case_No"].value_counts().dropna()
+    # Uses Case_UID (not raw Case_No) — see utils/data_loader.py for why:
+    # Case_No alone collides across benches, and for Islamabad specifically
+    # is often just a cause-list serial/position number, not a real case
+    # registration number.
+    case_counts = df["Case_UID"].value_counts().dropna()
     total_unique_cases = len(case_counts)
     avg_listings_per_case = case_counts.mean() if total_unique_cases else 0
     repeat_cases = case_counts[case_counts > 1]
     repeat_pct = (len(repeat_cases) / total_unique_cases * 100) if total_unique_cases else 0
     heavy_repeat_cases = case_counts[case_counts >= 5]
     most_recurring_val = case_counts.max() if total_unique_cases else 0
-    most_recurring_case = case_counts.idxmax() if total_unique_cases else "N/A"
 
     with st.container(key="card_wa_6"):
         section_header("Case Recurrence & Backlog Proxy Analysis")
@@ -268,13 +278,13 @@ def render():
         if total_unique_cases:
             rc1, rc2, rc3, rc4 = st.columns(4)
             with rc1:
-                simple_kpi_card("Unique Cases", f"{total_unique_cases:,}", "Distinct Case_No")
+                simple_kpi_card("Unique Cases", f"{total_unique_cases:,}", "Distinct cases")
             with rc2:
                 simple_kpi_card("Avg Listings / Case", f"{avg_listings_per_case:,.1f}", "Across all cases")
             with rc3:
                 simple_kpi_card("Re-listed Cases", f"{repeat_pct:.1f}%", f"{len(repeat_cases):,} cases listed 2+ times")
             with rc4:
-                simple_kpi_card("Most Recurring Case", f"{most_recurring_val:,} listings", most_recurring_case)
+                simple_kpi_card("Most Recurring Case", f"{most_recurring_val:,} listings", "See table \u2192")
 
             st.write("")
 
@@ -292,14 +302,15 @@ def render():
             with fc2:
                 st.markdown(f"<div style='font-size:0.88rem;font-weight:600;color:{COLORS['text_primary']};margin-bottom:8px;'>Top 10 Most Re-Listed Cases</div>", unsafe_allow_html=True)
                 top_recurring = (
-                    df.dropna(subset=["Case_No"])
-                    .groupby("Case_No")
+                    df.dropna(subset=["Case_UID"])
+                    .groupby("Case_UID")
                     .agg(
                         Court=("Court", "first"),
+                        Case_No=("Case_No", "first"),
                         Case_Title=("Case_Title", "first"),
-                        Listings=("Case_No", "size"),
+                        Listings=("Case_UID", "size"),
                     )
-                    .reset_index()
+                    .reset_index(drop=True)
                     .sort_values("Listings", ascending=False)
                     .head(10)
                 )
