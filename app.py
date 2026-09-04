@@ -124,6 +124,9 @@ elif active_page == "Trends Over Time":
 elif active_page == "Workload Analysis":
     from views.workload_analysis import render as render_workload_analysis
     _render_page(render_workload_analysis, "Workload Analysis")
+elif active_page == "Litigant Insights":
+    from views.litigant_insights import render as render_litigant_insights
+    _render_page(render_litigant_insights, "Litigant Insights")
 elif active_page == "Reports":
     from views.reports import render as render_reports
     _render_page(render_reports, "Reports")
