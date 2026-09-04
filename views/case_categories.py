@@ -328,6 +328,29 @@ def render():
     st.write("")
 
     # ---------------------------------------------------------------------
+    # 5b. LEGAL SECTIONS BY CATEGORY — which statutory citations dominate
+    # within each case category (bail applications typically cite specific
+    # PPC sections, for example)
+    # ---------------------------------------------------------------------
+    with st.container(key="card_catg_sections_by_cat"):
+        section_header("Top Legal Sections Within Each Category")
+        if total_cases and len(sec_df_legal):
+            st.caption(
+                f"Among the same {len(sec_df_legal):,} genuine statutory citations above, broken down by "
+                "which case category they most often appear in."
+            )
+            top_cats_for_sections = sec_df_legal["Case_Category"].value_counts().head(5).index.tolist()
+            for cat in top_cats_for_sections:
+                cat_sections = sec_df_legal[sec_df_legal["Case_Category"] == cat]["Section"].value_counts().head(3)
+                if len(cat_sections):
+                    items = " · ".join(f"**{sec}** ({cnt})" for sec, cnt in cat_sections.items())
+                    st.markdown(f"**{cat}**  \n{items}")
+        else:
+            st.info("Not enough genuine statutory citations in the current selection for a category breakdown.")
+
+    st.write("")
+
+    # ---------------------------------------------------------------------
     # 6. CATEGORY INSIGHTS
     # ---------------------------------------------------------------------
     with st.container(key="card_catg_6"):
