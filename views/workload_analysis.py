@@ -294,6 +294,43 @@ def render():
     st.write("")
 
     # ---------------------------------------------------------------------
+    # 4b. ADVOCATE OPPOSITION NETWORK — which advocate pairs face each
+    # other most often, using rows where BOTH sides' advocate is on file
+    # ---------------------------------------------------------------------
+    with st.container(key="card_wa_opposition"):
+        section_header("Advocate Opposition Network — Most Frequent Matchups")
+        both_present = (
+            df["Petitioner_Advocate"].notna() & df["Respondent_Advocate"].notna()
+            & (df["Petitioner_Advocate"].astype(str).str.strip() != "")
+            & (df["Respondent_Advocate"].astype(str).str.strip() != "")
+        )
+        coverage_pct = (both_present.sum() / total_cases * 100) if total_cases else 0
+        st.caption(
+            f"Based on the **{both_present.sum():,} listings ({coverage_pct:.1f}% of the current selection)** "
+            "that have both a Petitioner Advocate and a Respondent Advocate on file — most cause-list rows "
+            "only record one side, so this is scoped to that subset."
+        )
+        if total_cases and both_present.sum():
+            pairs = (
+                df[both_present]
+                .groupby(["Petitioner_Advocate", "Respondent_Advocate"])
+                .size()
+                .reset_index(name="Matchups")
+                .sort_values("Matchups", ascending=False)
+                .head(10)
+            )
+            pair_labels = [f"{row.Petitioner_Advocate}  vs  {row.Respondent_Advocate}" for row in pairs.itertuples()]
+            # Truncate very long combined names for chart legibility — full
+            # names remain visible in the table version below it.
+            short_labels = [lbl if len(lbl) <= 70 else lbl[:67] + "..." for lbl in pair_labels]
+            fig = gradient_bar(short_labels, pairs["Matchups"].tolist(), color=COLORS["accent_secondary"], orientation="h", height=380)
+            st.plotly_chart(fig, width='stretch', config={"displayModeBar": False})
+            with st.expander("View full advocate names (not truncated)"):
+                st.dataframe(pairs, width='stretch', hide_index=True)
+        else:
+            st.info("No listings with both a Petitioner and Respondent Advocate on file in the current selection.")
+
+    # ---------------------------------------------------------------------
     # 6. CASE RECURRENCE / LISTING FREQUENCY ANALYSIS (backlog proxy)
     # ---------------------------------------------------------------------
     # Cause lists don't record disposal dates, so how many times the same
