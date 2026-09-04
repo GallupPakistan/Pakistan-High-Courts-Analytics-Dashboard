@@ -34,6 +34,7 @@ NAV_SECTIONS = [
         ("Case Categories", "sell"),
         ("Trends Over Time", "trending_up"),
         ("Workload Analysis", "groups"),
+        ("Litigant Insights", "account_balance"),
     ]),
     ("OTHERS", [
         ("Reports", "description"),
