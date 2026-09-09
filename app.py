@@ -49,36 +49,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------------------------------------------------------------------
-# IFRAME HEIGHT REPORTING — for the WordPress embed at
-# galluppakistandigitalanalytics.com, whose page JS listens for a
-# `{type: "streamlit-height", height: N}` postMessage to auto-size the
-# iframe. Streamlit doesn't send this on its own, so without this the
-# iframe stays fixed at whatever CSS height the embedding page set
-# (e.g. 100vh), leaving a large blank gap below the actual app content
-# on any page shorter than the viewport. This runs inside a small
-# (height=0, invisible) components.html iframe: window.parent from
-# there is the main Streamlit app's own window (same origin), so its
-# document.body.scrollHeight is the real app content height; window.top
-# always reaches the outermost page regardless of nesting, which is the
-# WordPress page that actually needs the message.
-st.components.v1.html(
-    """
-    <script>
-    function reportHeight() {
-      try {
-        var h = window.parent.document.body.scrollHeight;
-        window.top.postMessage({type: 'streamlit-height', height: h}, '*');
-      } catch (e) {}
-    }
-    reportHeight();
-    setInterval(reportHeight, 400);
-    window.parent.addEventListener('resize', reportHeight);
-    </script>
-    """,
-    height=0,
-)
-
 active_page = render_sidebar()
 
 # Exception class names that are Streamlit's own internal control flow
