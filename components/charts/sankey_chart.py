@@ -54,7 +54,7 @@ def build_court_flow_sankey(df: pd.DataFrame, top_n_categories: int = 7, height:
     cat_totals = work["Category_Group"].value_counts()
     top_categories = cat_totals.head(top_n_categories).index.tolist()
     work = work.copy()
-    work["Category_Grouped"] = work["Category_Group"].where(
+    work["Category_Grouped"] = work["Category_Group"].astype(object).where(
         work["Category_Group"].isin(top_categories), "Other"
     )
 
