@@ -114,6 +114,21 @@ def load_master_data() -> pd.DataFrame:
 
     df["Judge_List"] = df["Judge"].apply(_parse_judges)
 
+    # Memory optimization — this dataframe is cached for the app's entire
+    # lifetime (@st.cache_data), so its resident size directly affects
+    # whether the app stays under Streamlit Cloud's memory ceiling. These
+    # columns repeat the same small set of values across hundreds of
+    # thousands of rows (Court: 5 values, Judge: ~360, Court_Room: ~80,
+    # etc.) — category dtype stores each row as a small integer code
+    # instead of repeating the full string, cutting overall memory by
+    # roughly a third with no behavior change (groupby/value_counts/
+    # str.contains all work the same on category dtype).
+    for _cat_col in ["Court", "Bench_Location", "Bench_Type", "Case_Category",
+                      "Category_Group", "Bench_Type_Group", "Court_Room",
+                      "Case_Stage", "Section", "Judge"]:
+        if _cat_col in df.columns:
+            df[_cat_col] = df[_cat_col].astype("category")
+
     return df
 
 
