@@ -58,6 +58,12 @@ def render():
     filters = render_filter_bar(df_all, key_prefix="ov")
     df = apply_filters(df_all, **filters)
 
+    # Explode combined-bench Judge_List ONCE per render and reuse the result
+    # everywhere on this page — calling .explode() repeatedly on a
+    # 300k+-row dataframe is a real memory cost, and this page needed it
+    # in three separate places before.
+    judges_exploded = df.explode("Judge_List")["Judge_List"].replace("", pd.NA)
+
     gaps = find_coverage_gaps(df, COURTS_ORDER)
     if gaps:
         st.warning(
@@ -73,7 +79,7 @@ def render():
     # ------------------------------------------------------------------
     total_cases      = len(df)
     unique_cases     = df["Case_UID"].nunique()
-    total_judges     = df.explode("Judge_List")["Judge_List"].replace("", pd.NA).nunique()
+    total_judges     = judges_exploded.nunique()
     total_categories = df["Case_Category"].nunique()
     courts_covered   = df["Court"].nunique()
 
@@ -207,7 +213,7 @@ def render():
                     df.groupby(["Bench_Location", "Court"]).size().reset_index(name="Cases")
                     .sort_values("Cases", ascending=False).head(5)
                 )
-                top_benches["Bench_Location"] = top_benches["Bench_Location"].fillna("(Unspecified)")
+                top_benches["Bench_Location"] = top_benches["Bench_Location"].astype(object).fillna("(Unspecified)")
                 st.dataframe(
                     top_benches.rename(columns={"Bench_Location": "Bench / Location"}),
                     width='stretch', hide_index=True,
@@ -226,8 +232,7 @@ def render():
         # row per individual judge, so a joint-bench listing counts toward
         # each judge who actually sat on it, not toward a fabricated
         # "judge" that is really two-or-more people concatenated together.
-        judge_counts    = df.explode("Judge_List")["Judge_List"].value_counts()
-        judge_counts    = judge_counts[judge_counts.index.notna() & (judge_counts.index != "")]
+        judge_counts    = judges_exploded[judges_exploded.notna() & (judges_exploded != "")].value_counts()
         avg_cases       = judge_counts.mean()     if len(judge_counts) else 0
         max_judge_count = judge_counts.max()      if len(judge_counts) else 0
         min_judge_count = judge_counts.min()      if len(judge_counts) else 0
@@ -265,8 +270,7 @@ def render():
                 insight_pill(icon("tags", size=16, color=COLORS["warning"]),
                              f"<b>{cat_top.idxmax()}</b> is the most common category ({cat_top.max():,} listings).")
 
-            judge_counts = df.explode("Judge_List")["Judge_List"].value_counts()
-            judge_counts = judge_counts[judge_counts.index.notna() & (judge_counts.index != "")]
+            judge_counts = judges_exploded[judges_exploded.notna() & (judges_exploded != "")].value_counts()
             if len(judge_counts):
                 avg  = judge_counts.mean()
                 mn   = judge_counts.min()
