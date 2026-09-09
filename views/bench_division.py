@@ -84,7 +84,7 @@ def render():
                         unsafe_allow_html=True
                     )
                     cdf = df[df["Court"] == court].copy()
-                    cdf["Bench_Location"] = cdf["Bench_Location"].fillna(court)
+                    cdf["Bench_Location"] = cdf["Bench_Location"].astype(object).fillna(court)
                     bench_stats = (
                         cdf.groupby("Bench_Location")
                         .size()
@@ -92,7 +92,7 @@ def render():
                         .sort_values("Listings", ascending=False)
                     )
                     cdf_jx = df_jx_all[df_jx_all["Court"] == court].copy()
-                    cdf_jx["Bench_Location"] = cdf_jx["Bench_Location"].fillna(court)
+                    cdf_jx["Bench_Location"] = cdf_jx["Bench_Location"].astype(object).fillna(court)
                     judges_per_bench = cdf_jx.groupby("Bench_Location")["Judge_List"].nunique()
                     bench_stats["Judges"] = bench_stats["Bench_Location"].map(judges_per_bench).fillna(0).astype(int)
                     bench_stats.columns = ["Bench", "Listings", "Judges"]
