@@ -20,7 +20,7 @@ import io
 import requests
 import pandas as pd
 
-OUT_PATH = "all_courts_combined.parquet"
+OUT_PATH = "combined_dashboard_master.parquet"
 
 RAW = "https://raw.githubusercontent.com/{repo}/main/{path}"
 
