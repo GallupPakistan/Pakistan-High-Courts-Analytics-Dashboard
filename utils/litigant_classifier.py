@@ -45,6 +45,22 @@ def classify_litigant(name) -> str:
 
 
 def add_litigant_type(df: pd.DataFrame, source_col: str = "Respondent", target_col: str = "Respondent_Type") -> pd.DataFrame:
-    """Add a classified litigant-type column, vectorized over a dataframe."""
-    df[target_col] = df[source_col].apply(classify_litigant)
+    """Add a classified litigant-type column, vectorized over a dataframe.
+
+    Uses pandas' native (C-level) str.contains() across the whole column
+    at once instead of calling classify_litigant() row-by-row via
+    .apply() — meaningfully cheaper on a 400k+ row dataframe, where a
+    per-row Python regex call is one of the more expensive things a page
+    render can do.
+    """
+    import numpy as np
+    col = df[source_col].astype(str)
+    is_blank = df[source_col].isna() | (col.str.strip() == "")
+    is_govt = col.str.contains(_PATTERN, na=False)
+    result = np.select(
+        [is_blank, ~is_blank & is_govt],
+        ["Unknown", "Government / Public Sector"],
+        default="Private / Individual",
+    )
+    df[target_col] = pd.Categorical(result, categories=["Unknown", "Government / Public Sector", "Private / Individual"])
     return df
