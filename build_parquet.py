@@ -51,6 +51,11 @@ SOURCES = {
         "path": "combined_data.xlsx",
         "kind": "xlsx",
     },
+    "PHC_Benches": {
+        "repo": "GallupPakistan/PHC-Dasboard",
+        "path": "phc_benches_combined.parquet",
+        "kind": "parquet",
+    },
 }
 
 UNIFIED_COLS = [
@@ -164,6 +169,28 @@ def load_lhc():
     return out
 
 
+def load_phc_benches():
+    data = fetch_bytes(SOURCES["PHC_Benches"]["repo"], SOURCES["PHC_Benches"]["path"])
+    df = pd.read_parquet(io.BytesIO(data))
+    bench_labels = df.get("Bench", "").astype(str)
+    out = pd.DataFrame({
+        "Court": "Peshawar High Court - " + bench_labels,
+        "Date": df.get("Date", ""),
+        "Year": df.get("Year", ""),
+        "Month": df.get("Month", ""),
+        "Day": df.get("Day", ""),
+        "Case_No": df.get("Case_No", ""),
+        "Section": df.get("Section", ""),
+        "Judges": df.get("Judges", ""),
+        "Petitioner": df.get("Case_Title", ""),
+        "Respondent": "",
+        "Petitioner_Advocate": df.get("Petitioner_Advocate", ""),
+        "Respondent_Advocate": df.get("Respondent_Advocates", ""),
+        "Source_File": df.get("Source_File", ""),
+    })
+    return out
+
+
 def load_ihc():
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_SERVICE_ROLE")
@@ -212,6 +239,7 @@ def main():
     loaders = {
         "BHC": load_bhc,
         "PHC": load_phc,
+        "PHC_Benches": load_phc_benches,
         "Sindh": load_sindh,
         "LHC": load_lhc,
         "IHC": load_ihc,
