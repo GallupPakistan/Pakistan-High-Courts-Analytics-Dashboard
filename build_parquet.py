@@ -20,6 +20,12 @@ import io
 import requests
 import pandas as pd
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # reads .env in the same folder if present (local runs)
+except ImportError:
+    pass
+
 OUT_PATH = "combined_dashboard_master.parquet"
 
 RAW = "https://raw.githubusercontent.com/{repo}/main/{path}"
@@ -135,20 +141,26 @@ def load_lhc():
         for n in names:
             if n.lower() in cols:
                 return df[cols[n.lower()]]
-        return ""
+        return pd.Series([""] * len(df), index=df.index)
+
+    title = col("Title").astype(str)
+    split = title.str.split(r"\s+[Vv][Ss]\.?\s+", n=1, expand=True)
+    petitioner = split[0] if 0 in split.columns else title
+    respondent = split[1] if 1 in split.columns else pd.Series([""] * len(df), index=df.index)
 
     out = pd.DataFrame({
         "Court": "Lahore High Court",
-        "Date": col("Date"),
-        "Case_No": col("Case No", "Case_No"),
-        "Section": col("Section"),
-        "Judges": col("Judges", "Bench"),
-        "Petitioner": col("Petitioner"),
-        "Respondent": col("Respondent"),
-        "Petitioner_Advocate": col("Petitioner Advocate", "Advocate"),
-        "Respondent_Advocate": col("Respondent Advocate"),
-        "Source_File": "combined_data.xlsx",
-    })
+        "Date": col("Hearing Date"),
+        "Case_No": col("Case#"),
+        "Section": col("Category"),
+        "Judges": col("Justice"),
+        "Petitioner": petitioner,
+        "Respondent": respondent,
+        "Petitioner_Advocate": col("Lawyer"),
+        "Respondent_Advocate": "",
+        "Source_File": col("Source_File"),
+    }, index=df.index)
+    print(f"LHC columns found in file: {list(df.columns)}")
     return out
 
 
