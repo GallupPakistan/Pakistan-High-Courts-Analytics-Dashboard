@@ -52,7 +52,7 @@ SOURCES = {
         "kind": "xlsx",
     },
     "PHC_Benches": {
-        "repo": "GallupPakistan/PHC-Dasboard",
+        "repo": "GallupPakistan/PHC-Dashboard",
         "path": "phc_benches_combined.parquet",
         "kind": "parquet",
     },
