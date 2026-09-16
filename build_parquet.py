@@ -8,7 +8,7 @@ combined dashboard's app.py reads.
 Sources:
   - IHC      -> Supabase table
   - BHC      -> raw GitHub xlsx  (GallupPakistan/Balochistan-High-Court)
-  - PHC      -> raw GitHub parquet (GallupPakistan/PHC-Dasboard)
+  - PHC      -> raw GitHub parquet (GallupPakistan/PHC-Dashboard)
   - Sindh    -> raw GitHub xlsx  (GallupPakistan/Sindh_Highcourt_dashboard)
   - LHC      -> raw GitHub xlsx  (GallupPakistan/LHC_DAashboard)
 
@@ -37,7 +37,7 @@ SOURCES = {
         "kind": "xlsx",
     },
     "PHC": {
-        "repo": "GallupPakistan/PHC-Dasboard",
+        "repo": "GallupPakistan/PHC-Dashboard",
         "path": "cause_lists_combined_2017_Jan_to_2026_July_MASTER.cache.parquet",
         "kind": "parquet",
     },
