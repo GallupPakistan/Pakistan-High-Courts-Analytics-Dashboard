@@ -51,11 +51,11 @@ SOURCES = {
         "path": "combined_data.xlsx",
         "kind": "xlsx",
     },
-    "PHC_Benches": {
-        "repo": "GallupPakistan/PHC-Dashboard",
-        "path": "phc_benches_combined.parquet",
-        "kind": "parquet",
-    },
+   "PHC_Benches": {
+    "repo": "GallupPakistan/PHC-Dasboard",
+    "path": "scripts/phc_benches_combined.parquet",
+    "kind": "parquet",
+},
 }
 
 UNIFIED_COLS = [
