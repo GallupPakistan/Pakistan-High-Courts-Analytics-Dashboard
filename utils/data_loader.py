@@ -314,5 +314,13 @@ def apply_filters(df: pd.DataFrame, court=None, bench_location=None, case_catego
         out = out[out["Case_Category"] == case_category]
     if date_range:
         start, end = date_range
-        out = out[(out["Hearing_Date"] >= pd.Timestamp(start)) & (out["Hearing_Date"] <= pd.Timestamp(end))]
+        # Rows with no parsed Hearing_Date (NaT) must stay in — they still
+        # count toward Total Listings (see load_master_data docstring); a
+        # NaT vs Timestamp comparison is always False, so without this
+        # explicit carve-out the default (min,max) date filter silently
+        # drops every undated row instead of behaving like "no filter".
+        out = out[
+            out["Hearing_Date"].isna()
+            | ((out["Hearing_Date"] >= pd.Timestamp(start)) & (out["Hearing_Date"] <= pd.Timestamp(end)))
+        ]
     return out
