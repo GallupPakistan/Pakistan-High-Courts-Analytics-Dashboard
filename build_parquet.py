@@ -8,7 +8,7 @@ combined dashboard's app.py reads.
 Sources:
   - IHC      -> Supabase table
   - BHC      -> raw GitHub xlsx  (GallupPakistan/Balochistan-High-Court)
-  - PHC      -> raw GitHub parquet (GallupPakistan/PHC-Dashboard)
+  - PHC      -> raw GitHub parquet (GallupPakistan/PHC-Dasboard)
   - Sindh    -> raw GitHub xlsx  (GallupPakistan/Sindh_Highcourt_dashboard)
   - LHC      -> raw GitHub xlsx  (GallupPakistan/LHC_DAashboard)
 
@@ -37,7 +37,7 @@ SOURCES = {
         "kind": "xlsx",
     },
     "PHC": {
-        "repo": "GallupPakistan/PHC-Dashboard",
+        "repo": "GallupPakistan/PHC-Dasboard",
         "path": "cause_lists_combined_2017_Jan_to_2026_July_MASTER.cache.parquet",
         "kind": "parquet",
     },
@@ -51,11 +51,11 @@ SOURCES = {
         "path": "combined_data.xlsx",
         "kind": "xlsx",
     },
-   "PHC_Benches": {
-    "repo": "GallupPakistan/PHC-Dasboard",
-    "path": "scripts/phc_benches_combined.parquet",
-    "kind": "parquet",
-},
+    "PHC_Benches": {
+        "repo": "GallupPakistan/PHC-Dasboard",
+        "path": "scripts/phc_benches_combined.parquet",
+        "kind": "parquet",
+    },
 }
 
 UNIFIED_COLS = [
