@@ -26,7 +26,7 @@ try:
 except ImportError:
     pass
 
-OUT_PATH = "combined_dashboard_master.parquet"
+OUT_PATH = "data/combined_dashboard_master.parquet"
 
 RAW = "https://raw.githubusercontent.com/{repo}/main/{path}"
 
