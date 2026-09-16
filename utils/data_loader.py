@@ -4,12 +4,74 @@ data_loader.py
 Loads the combined dashboard master file (parquet) once and caches it via
 Streamlit's cache so every page shares the same in-memory dataframe without
 re-reading from disk.
+
+--------------------------------------------------------------------------
+SCHEMA BRIDGE (added — see README "Schema mismatch fix")
+--------------------------------------------------------------------------
+The parquet file actually produced by build_parquet.py / the live scrape
+only carries 13 raw columns:
+
+    Court, Date, Year, Month, Day, Case_No, Section, Judges, Petitioner,
+    Respondent, Petitioner_Advocate, Respondent_Advocate, Source_File
+
+...but every view in this dashboard is written against the richer
+16-column "unified schema" documented in views/data_dictionary.py
+(Hearing_Date, Bench_Location, Bench_Type, Case_Category, Judge,
+Case_Title, Court_Room, ...). Loading the raw file directly used to raise
+a KeyError the first time a view touched "Hearing_Date", which app.py's
+safety net silently turned into a generic "No Data Found" card.
+
+This module now derives every one of those missing columns from the raw
+13, per-court, before the rest of the pipeline (dedup, Case_UID,
+normalizers, Judge_List) runs unchanged. Nothing downstream had to change.
+
+Per-court derivation notes:
+  - Court: "Peshawar High Court - Abbottabad" etc. is split into
+    Court="Peshawar" + Bench_Location="Abbottabad"; the other 4 courts'
+    " High Court" suffix is simply dropped.
+  - Bench_Location: Sindh's own Source_File column already holds the
+    bench city name (Karachi/Hyderabad/Sukkur/Larkana/Mirpurkhas) — reused
+    directly. Balochistan is a single physical seat -> "Principal Seat
+    Quetta" for every row. Lahore and Islamabad carry no bench-location
+    signal in the raw data at all, so it's left blank for them (same
+    "single-seat court" handling the map/filters already had for
+    Islamabad).
+  - Hearing_Date: each court stamps its date in a different raw shape
+    (see _parse_hearing_dates) — parsed per-court, then combined. Main
+    Peshawar-seat rows (no city suffix) only carry a bare registration
+    Year in this scrape (no month/day), so Hearing_Date is NaT for them;
+    they still count in yearly KPIs/"Total Listings" via the Year
+    fallback below, but drop out of month-level trend/heatmap charts
+    (which already dropna on Year_Month) and don't get a calendar date in
+    Case Search. This is a genuine gap in the source scrape, not
+    something recoverable from this file — flagged in data_dictionary.py.
+  - Judge / Court_Room: the raw "Judges" field already has the exact
+    "<judge name(s)> | [ <block> - Court <n> ]" shape the rest of the app
+    expects for "Judge" — it's kept as-is. The trailing "[ ... ]" segment
+    is additionally split off into its own Court_Room column.
+  - Bench_Type: there's no raw bench-type label at all in this scrape, so
+    it's inferred from how many individual judges Judge_List resolves to
+    (1 -> Single Bench, 2 -> Division Bench, 3+ -> Full / Larger Bench),
+    using the exact label strings utils/bench_type_normalizer.py already
+    recognizes.
+  - Case_Category: the raw "Section" field is reused directly — it's the
+    only free-text field carrying this kind of information across all 5
+    courts, and utils/category_normalizer.py's rules already recognize
+    both genuine subject-matter strings (e.g. "Civil - Civil Revision...")
+    and administrative/listing-status strings (e.g. "NOTICE CASES") that
+    appear in it.
+  - Case_Title: built as "<Petitioner> VS <Respondent>" (falls back to
+    just Petitioner when Respondent is blank).
+  - Case_Year: left unset (NaN) — views/litigant_insights.py already
+    falls back to extracting it from Case_No when this column is empty.
 """
 
-import streamlit as st
-import pandas as pd
 import os
 import re
+
+import numpy as np
+import pandas as pd
+import streamlit as st
 
 from utils.category_normalizer import add_normalized_category
 from utils.bench_type_normalizer import add_normalized_bench_type
@@ -18,16 +80,123 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "combined_dash
 
 COURTS_ORDER = ["Sindh", "Lahore", "Islamabad", "Peshawar", "Balochistan"]
 
+# ---------------------------------------------------------------------
+# Raw -> unified schema bridge helpers
+# ---------------------------------------------------------------------
+
+_BRACKET_SUFFIX = re.compile(r"(\[[^\]]*\])\s*$")
+
+
+def _split_court(raw_court):
+    """'Peshawar High Court - Abbottabad' -> ('Peshawar', 'Abbottabad').
+    Every other court's ' High Court' suffix is simply dropped."""
+    text = str(raw_court).strip()
+    if text.startswith("Peshawar High Court"):
+        rest = text[len("Peshawar High Court"):].strip(" -")
+        return "Peshawar", (rest if rest else None)
+    return text.replace(" High Court", "").strip(), None
+
+
+def _parse_hearing_dates(df: pd.DataFrame) -> pd.Series:
+    """Per-court raw-date parsing -> a single Hearing_Date datetime series."""
+    out = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
+
+    # Balochistan: "20 Jul 2026 Monday 09:00 AM" -> keep the "DD Mon YYYY" head.
+    m = df["Court"] == "Balochistan"
+    heads = df.loc[m, "Date"].astype(str).str.extract(r"^(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})")[0]
+    out[m] = pd.to_datetime(heads, format="%d %b %Y", errors="coerce")
+
+    # Islamabad: already ISO "YYYY-MM-DD".
+    m = df["Court"] == "Islamabad"
+    out[m] = pd.to_datetime(df.loc[m, "Date"], format="%Y-%m-%d", errors="coerce")
+
+    # Lahore: "DD-MM-YYYY".
+    m = df["Court"] == "Lahore"
+    out[m] = pd.to_datetime(df.loc[m, "Date"], format="%d-%m-%Y", errors="coerce")
+
+    # Peshawar - D.I.Khan: "DD-MON-YY".
+    m = (df["Court"] == "Peshawar") & (df["Bench_Location"] == "D.I.Khan")
+    out[m] = pd.to_datetime(df.loc[m, "Date"], format="%d-%b-%y", errors="coerce")
+
+    # Peshawar - Abbottabad / Bannu: numeric Day + Month name + Year, three
+    # separate columns instead of one Date string.
+    m = (df["Court"] == "Peshawar") & (df["Bench_Location"].isin(["Abbottabad", "Bannu"]))
+    combo = (
+        df.loc[m, "Day"].astype(str).str.strip() + " "
+        + df.loc[m, "Month"].astype(str).str.strip() + " "
+        + df.loc[m, "Year"].astype(str).str.strip()
+    )
+    out[m] = pd.to_datetime(combo, format="%d %B %Y", errors="coerce")
+
+    # Sindh: Year + Month name + numeric Day, same three-column shape.
+    m = df["Court"] == "Sindh"
+    combo = (
+        df.loc[m, "Day"].astype(str).str.strip() + " "
+        + df.loc[m, "Month"].astype(str).str.strip() + " "
+        + df.loc[m, "Year"].astype(str).str.strip()
+    )
+    out[m] = pd.to_datetime(combo, format="%d %B %Y", errors="coerce")
+
+    # Main Peshawar seat (no city suffix) and Peshawar - Mingora: this scrape
+    # only has a bare weekday name / nothing at all -> stays NaT. Handled via
+    # the raw-Year fallback in load_master_data() for the yearly-scope filter.
+    return out
+
+
+def _parse_judges(raw):
+    if pd.isna(raw):
+        return []
+    judges_part = re.split(r"\s*\[", str(raw))[0]
+    names = re.split(r"\s*\|\s*|\s+&\s+|\s*,?\s*;\s*", judges_part)
+    return [n.strip() for n in names if n.strip()]
+
 
 @st.cache_data(show_spinner="Loading court data...")
 def load_master_data() -> pd.DataFrame:
     df = pd.read_parquet(DATA_PATH)
-    df["Hearing_Date"] = pd.to_datetime(df["Hearing_Date"], errors="coerce")
+
+    # ------------------------------------------------------------------
+    # SCHEMA BRIDGE: raw 13-column scrape -> the 16-column unified schema
+    # every view below is written against. See module docstring for the
+    # full reasoning behind each derivation.
+    # ------------------------------------------------------------------
+    split_res = df["Court"].apply(_split_court)
+    df["Bench_Location"] = split_res.apply(lambda t: t[1])
+    df["Court"] = split_res.apply(lambda t: t[0])
+
+    sindh_mask = df["Court"] == "Sindh"
+    df.loc[sindh_mask, "Bench_Location"] = df.loc[sindh_mask, "Source_File"]
+    df.loc[df["Court"] == "Balochistan", "Bench_Location"] = "Principal Seat Quetta"
+
+    df["Hearing_Date"] = _parse_hearing_dates(df)
     df["Year_Month"] = df["Hearing_Date"].dt.to_period("M").astype(str)
-    df["Year"] = df["Hearing_Date"].dt.year
+    df["Year_Month"] = df["Year_Month"].where(df["Hearing_Date"].notna())
+
+    # Effective year: prefer the parsed Hearing_Date; for rows where this
+    # scrape has no day/month at all (bare-Year Peshawar-seat rows), fall
+    # back to the raw Year field so they aren't dropped from the year-scope
+    # filter just because they lack month/day granularity.
+    df["Year"] = df["Hearing_Date"].dt.year.fillna(pd.to_numeric(df["Year"], errors="coerce"))
 
     # Restrict the dashboard to 2026 data only (2025 and any other years excluded).
     df = df[df["Year"] == 2026].reset_index(drop=True)
+
+    # Judge / Court_Room split off the raw "Judges" field's trailing
+    # "[ block - Court n ]" tag (kept together for clean_judge_label /
+    # clean_court_room_label in utils/formatting.py to format for display).
+    bracket = df["Judges"].astype(str).str.extract(_BRACKET_SUFFIX)[0]
+    df["Judge"] = df["Judges"]
+    df["Court_Room"] = bracket.where(df["Judges"].notna())
+
+    df["Case_Category"] = df["Section"]
+
+    resp = df["Respondent"].astype(str).str.strip()
+    df["Case_Title"] = np.where(
+        resp.replace("nan", "") != "",
+        df["Petitioner"].astype(str) + " VS " + df["Respondent"].astype(str),
+        df["Petitioner"].astype(str),
+    )
+    df["Case_Year"] = np.nan
 
     # The source scrape occasionally contains fully identical rows (same
     # court, case, hearing date, judge, parties — every column matches).
@@ -66,12 +235,11 @@ def load_master_data() -> pd.DataFrame:
     # Tribunals attached to a High Court are separate quasi-judicial forums,
     # not part of the High Court's own case docket, and were excluded by
     # design decision. A small number of tribunal rows leaked into the raw
-    # scrape (e.g. "Election Tribunal, Quetta" in Bench_Location, and an
-    # "Election_Tribunal_" Bench_Type at Peshawar) — drop them here so they
-    # never silently reappear in a count/chart.
+    # scrape (e.g. "Election Tribunal, Quetta" in Bench_Location) — drop
+    # them here so they never silently reappear in a count/chart.
     _tribunal_mask = (
         df["Bench_Location"].astype(str).str.contains("Tribunal", case=False, na=False) |
-        df["Bench_Type"].astype(str).str.contains("Tribunal", case=False, na=False)
+        df["Case_Category"].astype(str).str.contains("Tribunal", case=False, na=False)
     )
     df = df[~_tribunal_mask].reset_index(drop=True)
 
@@ -81,8 +249,34 @@ def load_master_data() -> pd.DataFrame:
     # Banking", "Writ - Banking & Finance - Miscellaneous", ...). Add a
     # normalized Category_Group column so cross-court category comparisons
     # aggregate correctly. See utils/category_normalizer.py for the mapping
-    # rules and utils/audit_category_mapping.py to review coverage.
+    # rules.
     df = add_normalized_category(df, source_col="Case_Category", target_col="Category_Group")
+
+    # The raw "Judge" field is not always a single judge's name — for
+    # Division/Full/Larger Bench sittings, the cause-list header lists every
+    # judge on that bench joined together in one string, e.g.
+    # "Mr. Justice X | Mr. Justice Y | [ Justice ... Block - Court 3 ]".
+    # Treating the whole string as "one judge" both undercounts the true
+    # number of distinct judges and misattributes workload (a 2-judge
+    # listing should count toward both judges' caseload, not neither/one).
+    # Judge_List splits the courtroom/block tag off and parses out the
+    # individual judge name(s) as a list, for accurate per-judge workload
+    # analysis. Use df.explode("Judge_List") wherever counting listings
+    # *per judge*; keep using the original "Judge" column/row count for
+    # Total Listings.
+    df["Judge_List"] = df["Judge"].apply(_parse_judges)
+
+    # Bench_Type: this scrape has no raw bench-configuration label at all,
+    # so it's inferred from how many individual judges Judge_List resolves
+    # to for that row — using the exact label strings
+    # utils/bench_type_normalizer.py already recognizes, so Bench_Type_Group
+    # (below) comes out correctly without any extra mapping.
+    _n_judges = df["Judge_List"].apply(len)
+    df["Bench_Type"] = np.select(
+        [_n_judges == 0, _n_judges == 1, _n_judges == 2],
+        ["Other / Unspecified", "Single Bench", "Division Bench"],
+        default="Full / Larger Bench",
+    )
 
     # Each court also records Bench_Type in its own free-text format, so the
     # same real bench configuration (e.g. a Single Bench) can appear as
@@ -92,27 +286,6 @@ def load_master_data() -> pd.DataFrame:
     # type's volume across look-alike labels. See
     # utils/bench_type_normalizer.py for the mapping rules.
     df = add_normalized_bench_type(df, source_col="Bench_Type", target_col="Bench_Type_Group")
-
-    # The raw "Judge" field is not always a single judge's name — for
-    # Division/Full/Larger Bench sittings, the cause-list header lists every
-    # judge on that bench joined together in one string, e.g.
-    # "Mr. Justice X | Mr. Justice Y | [ Justice ... Block - Court 3 ]".
-    # ~17% of listings (55k+ rows) are such combined strings. Treating the
-    # whole string as "one judge" both undercounts the true number of
-    # distinct judges and misattributes workload (a 2-judge listing should
-    # count toward both judges' caseload, not neither/one). Judge_List
-    # splits the courtroom/block tag off and parses out the individual
-    # judge name(s) as a list, for accurate per-judge workload analysis.
-    # Use df.explode("Judge_List") wherever counting listings *per judge*;
-    # keep using the original "Judge" column/row count for Total Listings.
-    def _parse_judges(raw):
-        if pd.isna(raw):
-            return []
-        judges_part = re.split(r"\s*\[", str(raw))[0]
-        names = re.split(r"\s*\|\s*|\s+&\s+|\s*,?\s*;\s*", judges_part)
-        return [n.strip() for n in names if n.strip()]
-
-    df["Judge_List"] = df["Judge"].apply(_parse_judges)
 
     # Memory optimization — this dataframe is cached for the app's entire
     # lifetime (@st.cache_data), so its resident size directly affects
