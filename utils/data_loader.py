@@ -178,8 +178,7 @@ def load_master_data() -> pd.DataFrame:
     # filter just because they lack month/day granularity.
     df["Year"] = df["Hearing_Date"].dt.year.fillna(pd.to_numeric(df["Year"], errors="coerce"))
 
-    # Restrict the dashboard to 2026 data only (2025 and any other years excluded).
-    df = df[df["Year"] == 2026].reset_index(drop=True)
+    # (Previously restricted to Year == 2026 only — removed so all years show.)
 
     # Judge / Court_Room split off the raw "Judges" field's trailing
     # "[ block - Court n ]" tag (kept together for clean_judge_label /
