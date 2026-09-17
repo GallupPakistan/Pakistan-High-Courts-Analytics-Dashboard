@@ -66,7 +66,7 @@ def render():
     # metric on this page — this page needed it in 4+ places before,
     # including one line that called .explode() twice in a single
     # expression, each one materializing a ~376k-row temporary dataframe.
-    df_jx = df.explode("Judge_List")
+    df_jx = df[["Court", "Year_Month", "Judge_List"]].explode("Judge_List")
     df_jx["Judge_List"] = df_jx["Judge_List"].replace("", pd.NA)
 
     total_cases = len(df)
