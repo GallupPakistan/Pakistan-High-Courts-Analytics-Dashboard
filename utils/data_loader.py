@@ -72,11 +72,36 @@ import re
 import numpy as np
 import pandas as pd
 import streamlit as st
+from pymongo import MongoClient
 
 from utils.category_normalizer import add_normalized_category
 from utils.bench_type_normalizer import add_normalized_bench_type
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "combined_dashboard_master.parquet")
+# ---------------------------------------------------------------------
+# MongoDB connection
+# ---------------------------------------------------------------------
+# Connection details come from Streamlit secrets (.streamlit/secrets.toml,
+# gitignored) so nothing sensitive lives in source control. Falls back to
+# environment variables so this also works outside Streamlit Cloud (e.g.
+# a plain "python build_something.py" run) if secrets.toml isn't present.
+
+
+def _get_secret(key, default=None):
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.environ.get(key, default)
+
+
+MONGO_URI = _get_secret("MONGO_URI")
+MONGO_DB = _get_secret("MONGO_DB", "PakistanCourtDB")
+MONGO_COLLECTION = _get_secret("MONGO_COLLECTION", "cases")
+
+
+@st.cache_resource(show_spinner=False)
+def _get_mongo_collection():
+    client = MongoClient(MONGO_URI)
+    return client[MONGO_DB][MONGO_COLLECTION]
 
 COURTS_ORDER = ["Sindh", "Lahore", "Islamabad", "Peshawar", "Balochistan"]
 
@@ -153,7 +178,10 @@ def _parse_judges(raw):
 
 @st.cache_data(show_spinner="Loading court data...")
 def load_master_data() -> pd.DataFrame:
-    df = pd.read_parquet(DATA_PATH)
+    coll = _get_mongo_collection()
+    # _id is Mongo's own ObjectId and carries no meaning for this app —
+    # exclude it at the query level rather than dropping it afterward.
+    df = pd.DataFrame(list(coll.find({}, {"_id": 0})))
 
     # ------------------------------------------------------------------
     # SCHEMA BRIDGE: raw 13-column scrape -> the 16-column unified schema
