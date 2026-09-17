@@ -188,6 +188,19 @@ def load_master_data() -> pd.DataFrame:
     df["Court_Room"] = bracket.where(df["Judges"].notna())
 
     df["Case_Category"] = df["Section"]
+    # The raw "Section" scrape field is blank (empty string) for ~76k rows
+    # and NaN for another ~27k, and both were flowing straight through as
+    # a literal empty Case_Category value. Category_Group already bucketed
+    # these into "Other / Uncategorized" via category_normalizer.py, but
+    # every chart/KPI/filter on this page reads the raw Case_Category
+    # column directly (Top Case Categories donut, category filter dropdown,
+    # "Categories" KPI count, "Dominant category" callout, etc.) — so the
+    # blank value was rendering as an unlabeled legend row (just a bare
+    # percentage, no text) instead of disappearing or reading sensibly.
+    # Give it one explicit, readable label instead so it displays properly
+    # everywhere Case_Category is used, without touching Category_Group.
+    _blank_category = df["Case_Category"].isna() | (df["Case_Category"].astype(str).str.strip() == "")
+    df.loc[_blank_category, "Case_Category"] = "Category Not Assigned"
 
     resp = df["Respondent"].astype(str).str.strip()
     df["Case_Title"] = np.where(
