@@ -69,7 +69,10 @@ def render():
     with st.container(key="card_bd_per_court"):
         section_header("Benches Within Each Court")
         if total_cases:
-            df_jx_all = df.explode("Judge_List")
+            # Slim to just the 3 columns this block actually uses before
+            # exploding — see compare_courts.py for why this matters on
+            # Streamlit Cloud's memory limit.
+            df_jx_all = df[["Court", "Bench_Location", "Judge_List"]].explode("Judge_List")
             df_jx_all["Judge_List"] = df_jx_all["Judge_List"].replace("", pd.NA)
 
             courts_present = [c for c in COURTS_ORDER if c in df["Court"].unique()]
@@ -174,7 +177,7 @@ def render():
         with st.container(key="card_bd_5"):
             section_header("Bench Location Summary Table")
             if total_cases:
-                df_jx_bd = df.explode("Judge_List")
+                df_jx_bd = df[["Bench_Location", "Judge_List"]].explode("Judge_List")
                 df_jx_bd["Judge_List"] = df_jx_bd["Judge_List"].replace("", pd.NA)
                 judges_per_bl = df_jx_bd.groupby("Bench_Location")["Judge_List"].nunique()
 
@@ -206,7 +209,7 @@ def render():
         with st.container(key="card_bd_7"):
             section_header("Active Judges per Bench Location")
             if total_cases:
-                exploded = df.explode("Judge_List")
+                exploded = df[["Bench_Location", "Judge_List"]].explode("Judge_List")
                 exploded = exploded[exploded["Judge_List"].notna() & (exploded["Judge_List"] != "")]
                 judges_per_bench = exploded.groupby("Bench_Location")["Judge_List"].nunique().sort_values(ascending=False).head(10)
                 fig = gradient_bar(judges_per_bench.index.tolist(), judges_per_bench.values.tolist(), color=COLORS["accent_tertiary"], orientation="h")
