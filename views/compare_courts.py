@@ -126,7 +126,13 @@ def render():
     # Explode combined-bench Judge_List ONCE for this render and reuse it
     # everywhere below — avoids repeatedly exploding a 300k+-row dataframe
     # in a per-court loop (was happening 5+ times per render before).
-    df_jx = df.explode("Judge_List")
+    # Project down to just the 2 columns this page ever reads off df_jx
+    # (Court, Judge_List) BEFORE exploding — exploding the full ~20-column
+    # frame (Petitioner, Respondent, Case_Title, Case_UID, etc. included)
+    # duplicates every one of those heavy string columns per judge for no
+    # reason, which was spiking memory enough to crash this page on
+    # Streamlit Cloud's free-tier RAM limit.
+    df_jx = df[["Court", "Judge_List"]].explode("Judge_List")
     df_jx["Judge_List"] = df_jx["Judge_List"].replace("", pd.NA)
 
     st.write("")
@@ -185,8 +191,8 @@ def render():
             )
 
     total_sel = len(df)
-    judges_a = df_a.explode("Judge_List")["Judge_List"].replace("", pd.NA).nunique()
-    judges_b = df_b.explode("Judge_List")["Judge_List"].replace("", pd.NA).nunique()
+    judges_a = df_a[["Judge_List"]].explode("Judge_List")["Judge_List"].replace("", pd.NA).nunique()
+    judges_b = df_b[["Judge_List"]].explode("Judge_List")["Judge_List"].replace("", pd.NA).nunique()
 
     # Mirrored KPI columns
     ka, kb = st.columns(2)
@@ -293,7 +299,7 @@ def render():
                 )
             else:
                 st.warning("⚠️ No single window has data for all 5 courts — showing full data instead.")
-        df_jx_section = df_b_section.explode("Judge_List")
+        df_jx_section = df_b_section[["Court", "Judge_List"]].explode("Judge_List")
         df_jx_section["Judge_List"] = df_jx_section["Judge_List"].replace("", pd.NA)
     else:
         df_jx_section = df_jx
