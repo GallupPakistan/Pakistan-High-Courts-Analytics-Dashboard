@@ -5,8 +5,11 @@ on:
     - cron: "0 8 * * *"   # 8:00 AM UTC = 1:00 PM PKT — after all 5 sources update
   workflow_dispatch:
 
+# No repo writes anymore — the build script pushes straight to MongoDB
+# instead of committing a parquet file, so this job no longer needs
+# contents: write or a commit/push step.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   combine:
@@ -21,22 +24,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install pandas pyarrow requests openpyxl
+        run: pip install pandas requests openpyxl pyarrow pymongo
 
-      - name: Build combined parquet
+      - name: Build combined data and push to MongoDB
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGO_DB: PakistanCourtDB
+          MONGO_COLLECTION: cases
         run: python build_parquet.py
-
-      - name: Commit and push if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/combined_dashboard_master.parquet
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Daily combined update: $(date -u +'%Y-%m-%d')"
-            git push
-          fi
