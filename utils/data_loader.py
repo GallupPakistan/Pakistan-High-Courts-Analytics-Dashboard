@@ -242,6 +242,17 @@ def load_master_data() -> pd.DataFrame:
     )
     df = df[~_tribunal_mask].reset_index(drop=True)
 
+    # Free the raw columns that were only ever inputs to the derivations
+    # above (dedup and Case_UID are already computed, so it's safe now).
+    # Every downstream view (checked across views/*.py) reads the derived
+    # columns instead (Hearing_Date, Judge, Court_Room, Case_Category,
+    # Bench_Location, ...) — these raw ones are never touched again.
+    # Together they were ~120MB of the cached dataframe's resident memory
+    # (Judges alone ~64MB, Source_File ~23MB, Date/Month/Day ~35MB
+    # combined) for zero further use — a meaningful chunk of what was
+    # pushing this cache over Streamlit Cloud's free-tier memory ceiling.
+    df = df.drop(columns=["Date", "Month", "Day", "Judges", "Source_File"])
+
     # Each court records Case_Category in its own free-text format, so the
     # same subject matter (e.g. banking litigation) can appear as dozens of
     # different raw strings across courts ("BANKING", "Civil - COS(B) -
@@ -297,9 +308,15 @@ def load_master_data() -> pd.DataFrame:
     # str.contains all work the same on category dtype).
     for _cat_col in ["Court", "Bench_Location", "Bench_Type", "Case_Category",
                       "Category_Group", "Bench_Type_Group", "Court_Room",
-                      "Case_Stage", "Section", "Judge"]:
+                      "Case_Stage", "Section", "Judge", "Year_Month"]:
         if _cat_col in df.columns:
             df[_cat_col] = df[_cat_col].astype("category")
+
+    # Year / Case_Year only ever hold small whole numbers (or NaN) — no
+    # need for 64-bit floats.
+    for _num_col in ["Year", "Case_Year"]:
+        if _num_col in df.columns:
+            df[_num_col] = df[_num_col].astype("float32")
 
     return df
 
