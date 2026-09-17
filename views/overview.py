@@ -62,7 +62,7 @@ def render():
     # everywhere on this page — calling .explode() repeatedly on a
     # 300k+-row dataframe is a real memory cost, and this page needed it
     # in three separate places before.
-    judges_exploded = df.explode("Judge_List")["Judge_List"].replace("", pd.NA)
+    judges_exploded = df[["Judge_List"]].explode("Judge_List")["Judge_List"].replace("", pd.NA)
 
     gaps = find_coverage_gaps(df, COURTS_ORDER)
     if gaps:
