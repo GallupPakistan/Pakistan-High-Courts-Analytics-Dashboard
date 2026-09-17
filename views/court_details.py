@@ -43,7 +43,7 @@ def render():
 
     # Explode combined-bench Judge_List ONCE and reuse it below — this page
     # needed it in 3 separate places before.
-    df_jx = df.explode("Judge_List")
+    df_jx = df[["Judge_List"]].explode("Judge_List")
     df_jx["Judge_List"] = df_jx["Judge_List"].replace("", pd.NA)
 
     st.write("")
