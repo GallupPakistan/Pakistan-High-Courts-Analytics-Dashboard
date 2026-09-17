@@ -19,6 +19,7 @@ import os
 import io
 import requests
 import pandas as pd
+from pymongo import MongoClient
 
 try:
     from dotenv import load_dotenv
@@ -27,6 +28,13 @@ except ImportError:
     pass
 
 OUT_PATH = "data/combined_dashboard_master.parquet"
+
+# Mongo destination for the combined data. Set MONGO_URI (and optionally
+# MONGO_DB / MONGO_COLLECTION) in the environment or a .env file — never
+# hardcode credentials here.
+MONGO_URI = os.environ.get("MONGO_URI")
+MONGO_DB = os.environ.get("MONGO_DB", "PakistanCourtDB")
+MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "cases")
 
 RAW = "https://raw.githubusercontent.com/{repo}/main/{path}"
 
@@ -263,8 +271,29 @@ def main():
 
     combined = pd.concat(frames, ignore_index=True)
     combined = combined.astype(str)
-    combined.to_parquet(OUT_PATH, index=False)
-    print(f"\nSaved {len(combined)} total rows -> {OUT_PATH}")
+
+    if not MONGO_URI:
+        print("MONGO_URI not set — skipping Mongo upload. "
+              "Set MONGO_URI (and optionally MONGO_DB/MONGO_COLLECTION) to push this data.")
+        return
+
+    client = MongoClient(MONGO_URI)
+    coll = client[MONGO_DB][MONGO_COLLECTION]
+    records = combined.to_dict("records")
+
+    # Full refresh: this script always produces the complete combined
+    # dataset from scratch, so replace the collection's contents rather
+    # than appending (appending would duplicate every row on each run).
+    coll.delete_many({})
+    if records:
+        # Insert in batches — a single 1M+ document insert_many call can
+        # hit driver/server message-size limits.
+        BATCH = 5000
+        for i in range(0, len(records), BATCH):
+            coll.insert_many(records[i:i + BATCH])
+            print(f"  inserted {min(i + BATCH, len(records))}/{len(records)}")
+
+    print(f"\nSaved {len(combined)} total rows -> MongoDB {MONGO_DB}.{MONGO_COLLECTION}")
 
 
 if __name__ == "__main__":
