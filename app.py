@@ -94,6 +94,30 @@ def _render_page(render_fn, page_label: str):
         print(f"[{page_label}] view raised an exception:", file=sys.stderr)
         traceback.print_exc()
         _no_data_card(page_label)
+    finally:
+        # Every page builds and discards several sizeable transient
+        # dataframes (filtered slices, exploded Judge_List views, plotly
+        # figures). Python frees those references immediately, but on
+        # Linux, glibc's allocator doesn't hand freed heap memory back to
+        # the OS by default — so the process's resident memory (RSS) only
+        # ever creeps upward across a session's page visits, even though
+        # nothing is actually leaked. On Streamlit Cloud's free 1GB limit,
+        # that slow creep is what eventually gets the app OOM-killed after
+        # sustained use (rather than on the very first heavy page), even
+        # after each page's own peak memory was brought well under the
+        # limit. gc.collect() clears any reference cycles Python's own
+        # collector hasn't gotten to yet, and malloc_trim(0) then asks
+        # glibc to actually release freed arenas back to the OS, which
+        # gc.collect() alone does not do.
+        import gc
+        gc.collect()
+        try:
+            import ctypes
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass  # Non-Linux / non-glibc environments (e.g. local dev on
+                   # macOS or Windows) simply skip this — gc.collect() above
+                   # still runs either way.
 
 
 # ---------------------------------------------------------------------
