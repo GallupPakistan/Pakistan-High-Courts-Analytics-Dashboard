@@ -182,6 +182,7 @@ def load_master_data() -> pd.DataFrame:
     # _id is Mongo's own ObjectId and carries no meaning for this app —
     # exclude it at the query level rather than dropping it afterward.
     df = pd.DataFrame(list(coll.find({}, {"_id": 0})))
+    st.write(f"DEBUG: fetched {len(df)} rows from {MONGO_DB}.{MONGO_COLLECTION}, columns: {list(df.columns)}")  # TEMP — remove after confirming
 
     # ------------------------------------------------------------------
     # SCHEMA BRIDGE: raw 13-column scrape -> the 16-column unified schema
