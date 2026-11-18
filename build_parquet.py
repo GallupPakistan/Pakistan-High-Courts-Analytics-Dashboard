@@ -19,7 +19,8 @@ import os
 import io
 import requests
 import pandas as pd
-from pymongo import MongoClient
+import hashlib
+import boto3
 
 try:
     from dotenv import load_dotenv
@@ -29,12 +30,10 @@ except ImportError:
 
 OUT_PATH = "data/combined_dashboard_master.parquet"
 
-# Mongo destination for the combined data. Set MONGO_URI (and optionally
-# MONGO_DB / MONGO_COLLECTION) in the environment or a .env file — never
-# hardcode credentials here.
-MONGO_URI = os.environ.get("MONGO_URI")
-MONGO_DB = os.environ.get("MONGO_DB", "PakistanCourtDB")
-MONGO_COLLECTION = os.environ.get("MONGO_COLLECTION", "cases")
+# DynamoDB destination. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY are picked up
+# from the environment by boto3 — never hardcode credentials here.
+AWS_REGION = os.environ.get("AWS_REGION", "ap-southeast-2")
+DDB_TABLE = os.environ.get("DYNAMODB_TABLE", "PakistanCourtCases")
 
 RAW = "https://raw.githubusercontent.com/{repo}/main/{path}"
 
@@ -253,6 +252,7 @@ def main():
         "IHC": load_ihc,
     }
     frames = []
+    all_ok = True
     for name, fn in loaders.items():
         try:
             df = fn()
@@ -264,6 +264,7 @@ def main():
             print(f"{name}: {len(df)} rows loaded")
         except Exception as e:
             print(f"{name}: FAILED ({e}) — skipping this source for this run")
+            all_ok = False
 
     if not frames:
         print("No data loaded from any source. Aborting.")
@@ -272,28 +273,52 @@ def main():
     combined = pd.concat(frames, ignore_index=True)
     combined = combined.astype(str)
 
-    if not MONGO_URI:
-        print("MONGO_URI not set — skipping Mongo upload. "
-              "Set MONGO_URI (and optionally MONGO_DB/MONGO_COLLECTION) to push this data.")
+    if not os.environ.get("AWS_ACCESS_KEY_ID") or not os.environ.get("AWS_SECRET_ACCESS_KEY"):
+        print("AWS credentials not set — skipping DynamoDB upload.")
         return
 
-    client = MongoClient(MONGO_URI)
-    coll = client[MONGO_DB][MONGO_COLLECTION]
-    records = combined.to_dict("records")
+    # Exact duplicate rows are dropped by the dashboard anyway.
+    combined = combined.drop_duplicates().reset_index(drop=True)
 
-    # Full refresh: this script always produces the complete combined
-    # dataset from scratch, so replace the collection's contents rather
-    # than appending (appending would duplicate every row on each run).
-    coll.delete_many({})
-    if records:
-        # Insert in batches — a single 1M+ document insert_many call can
-        # hit driver/server message-size limits.
-        BATCH = 5000
-        for i in range(0, len(records), BATCH):
-            coll.insert_many(records[i:i + BATCH])
-            print(f"  inserted {min(i + BATCH, len(records))}/{len(records)}")
+    # Stable row ID = hash of all columns, so re-runs only add genuinely new rows.
+    key = combined[UNIFIED_COLS[0]]
+    for c in UNIFIED_COLS[1:]:
+        key = key + "\x1f" + combined[c]
+    combined["row_id"] = key.map(lambda x: hashlib.sha1(x.encode("utf-8")).hexdigest())
 
-    print(f"\nSaved {len(combined)} total rows -> MongoDB {MONGO_DB}.{MONGO_COLLECTION}")
+    table = boto3.resource("dynamodb", region_name=AWS_REGION).Table(DDB_TABLE)
+
+    # IDs already in the table
+    have, kwargs = set(), {"ProjectionExpression": "row_id"}
+    while True:
+        r = table.scan(**kwargs)
+        have.update(i["row_id"] for i in r["Items"])
+        if "LastEvaluatedKey" not in r:
+            break
+        kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+    print(f"Table already has {len(have)} rows")
+
+    # Write only new rows
+    new = combined[~combined["row_id"].isin(have)]
+    with table.batch_writer() as bw:
+        for n, rec in enumerate(new.to_dict("records"), 1):
+            bw.put_item(Item=rec)
+            if n % 50000 == 0:
+                print(f"  written {n}/{len(new)}")
+    print(f"{len(new)} new rows written")
+
+    # Remove stale rows, but only if every source loaded
+    # (otherwise a failed source's data would be deleted by mistake).
+    if all_ok:
+        stale = have - set(combined["row_id"])
+        with table.batch_writer() as bw:
+            for rid in stale:
+                bw.delete_item(Key={"row_id": rid})
+        print(f"{len(stale)} stale rows removed")
+    else:
+        print("A source failed this run — skipping stale-row cleanup.")
+
+    print(f"\nDone. {len(combined)} rows in source -> DynamoDB {AWS_REGION}/{DDB_TABLE}")
 
 
 if __name__ == "__main__":
