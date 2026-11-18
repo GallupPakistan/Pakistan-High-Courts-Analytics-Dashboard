@@ -72,18 +72,18 @@ import re
 import numpy as np
 import pandas as pd
 import streamlit as st
-from pymongo import MongoClient
+import boto3
+from concurrent.futures import ThreadPoolExecutor
 
 from utils.category_normalizer import add_normalized_category
 from utils.bench_type_normalizer import add_normalized_bench_type
 
 # ---------------------------------------------------------------------
-# MongoDB connection
+# DynamoDB connection
 # ---------------------------------------------------------------------
-# Connection details come from Streamlit secrets (.streamlit/secrets.toml,
+# Credentials come from Streamlit secrets (.streamlit/secrets.toml,
 # gitignored) so nothing sensitive lives in source control. Falls back to
-# environment variables so this also works outside Streamlit Cloud (e.g.
-# a plain "python build_something.py" run) if secrets.toml isn't present.
+# environment variables outside Streamlit Cloud.
 
 
 def _get_secret(key, default=None):
@@ -93,15 +93,32 @@ def _get_secret(key, default=None):
         return os.environ.get(key, default)
 
 
-MONGO_URI = _get_secret("MONGO_URI")
-MONGO_DB = _get_secret("MONGO_DB", "PakistanHighCourt")
-MONGO_COLLECTION = _get_secret("MONGO_COLLECTION", "cases")
+AWS_REGION = _get_secret("AWS_REGION", "ap-southeast-2")
+DDB_TABLE = _get_secret("DYNAMODB_TABLE", "PakistanCourtCases")
 
 
-@st.cache_resource(show_spinner=False)
-def _get_mongo_collection():
-    client = MongoClient(MONGO_URI)
-    return client[MONGO_DB][MONGO_COLLECTION]
+def _scan_segment(creds, seg, total):
+    # boto3 resources aren't thread-safe -> one session per thread.
+    table = boto3.session.Session(**creds).resource("dynamodb").Table(DDB_TABLE)
+    items, kwargs = [], {"Segment": seg, "TotalSegments": total}
+    while True:
+        r = table.scan(**kwargs)
+        items.extend(r["Items"])
+        if "LastEvaluatedKey" not in r:
+            return items
+        kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+
+
+def _read_all_items(total=8):
+    creds = dict(
+        aws_access_key_id=_get_secret("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=_get_secret("AWS_SECRET_ACCESS_KEY"),
+        region_name=AWS_REGION,
+    )
+    with ThreadPoolExecutor(total) as ex:
+        parts = list(ex.map(lambda s: _scan_segment(creds, s, total), range(total)))
+    return [item for part in parts for item in part]
+
 
 COURTS_ORDER = ["Sindh", "Lahore", "Islamabad", "Peshawar", "Balochistan"]
 
@@ -178,10 +195,8 @@ def _parse_judges(raw):
 
 @st.cache_data(show_spinner="Loading court data...")
 def load_master_data() -> pd.DataFrame:
-    coll = _get_mongo_collection()
-    # _id is Mongo's own ObjectId and carries no meaning for this app —
-    # exclude it at the query level rather than dropping it afterward.
-    df = pd.DataFrame(list(coll.find({}, {"_id": 0})))
+    # row_id is only a DynamoDB key; drop it so drop_duplicates() below still works.
+    df = pd.DataFrame(_read_all_items()).drop(columns=["row_id"])
 
     # ------------------------------------------------------------------
     # SCHEMA BRIDGE: raw 13-column scrape -> the 16-column unified schema
