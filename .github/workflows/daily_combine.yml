@@ -5,7 +5,7 @@ on:
     - cron: "0 8 * * *"   # 8:00 AM UTC = 1:00 PM PKT — after all 5 sources update
   workflow_dispatch:
 
-# No repo writes anymore — the build script pushes straight to MongoDB
+# No repo writes anymore — the build script pushes straight to DynamoDB
 # instead of committing a parquet file, so this job no longer needs
 # contents: write or a commit/push step.
 permissions:
@@ -24,13 +24,14 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install pandas requests openpyxl pyarrow pymongo
+        run: pip install pandas requests openpyxl pyarrow boto3
 
-      - name: Build combined data and push to MongoDB
+      - name: Build combined data and push to DynamoDB
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
-          MONGO_URI: ${{ secrets.MONGO_URI }}
-          MONGO_DB: PakistanCourtDB
-          MONGO_COLLECTION: cases
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          DYNAMODB_TABLE: ${{ secrets.DYNAMODB_TABLE }}
         run: python build_parquet.py
