@@ -271,7 +271,7 @@ def main():
         return
 
     combined = pd.concat(frames, ignore_index=True)
-    combined = combined.astype(str)
+    combined = combined.fillna("").astype(str)
 
     if not os.environ.get("AWS_ACCESS_KEY_ID") or not os.environ.get("AWS_SECRET_ACCESS_KEY"):
         print("AWS credentials not set — skipping DynamoDB upload.")
